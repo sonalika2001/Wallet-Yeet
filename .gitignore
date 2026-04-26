@@ -1,0 +1,57 @@
+# Strategy & planning files (keep private during hackathon)
+PLAN.md
+RESEARCH.md
+ARCHITECTURE.md
+PRIZE_INTEGRATION.md
+SEED_DEMO.md
+CLAUDE.md
+NOTES.md
+TODO.md
+
+# Foundry
+out/
+cache/
+broadcast/
+forge-cache/
+
+# Node
+node_modules/
+dist/
+.next/
+build/
+.turbo/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+secrets/
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code (per-machine)
+.claude/settings.local.json
+
+# Logs
+*.log
+logs/
+
+# Local data
+data/
