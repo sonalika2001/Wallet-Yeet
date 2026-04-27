@@ -22,6 +22,7 @@ contract MockENSRegistry is IENSRegistry {
         owners[node] = newOwner;
     }
 }
+
 contract MockERC1155 is ERC1155 {
     constructor() ERC1155("ipfs://Mock1155/{id}") {}
 
@@ -31,12 +32,7 @@ contract MockERC1155 is ERC1155 {
 }
 
 contract MockUniswapRouter is IUniswapV3Router {
-    function exactInputSingle(ExactInputSingleParams calldata params)
-        external
-        payable
-        override
-        returns (uint256)
-    {
+    function exactInputSingle(ExactInputSingleParams calldata params) external payable override returns (uint256) {
         IERC20(params.tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
         IERC20(params.tokenOut).transfer(params.recipient, params.amountIn);
         return params.amountIn;
@@ -44,12 +40,7 @@ contract MockUniswapRouter is IUniswapV3Router {
 }
 
 contract RevertingUniswapRouter is IUniswapV3Router {
-    function exactInputSingle(ExactInputSingleParams calldata)
-        external
-        payable
-        override
-        returns (uint256)
-    {
+    function exactInputSingle(ExactInputSingleParams calldata) external payable override returns (uint256) {
         revert("router boom");
     }
 }
@@ -120,11 +111,7 @@ contract MigrationVaultTest is Test {
         return vault.executeMigration(ops);
     }
 
-    function _expectedMigrationId(address from, uint256 ts, uint256 opCount)
-        internal
-        pure
-        returns (uint256)
-    {
+    function _expectedMigrationId(address from, uint256 ts, uint256 opCount) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(from, ts, opCount)));
     }
 
@@ -173,11 +160,7 @@ contract MigrationVaultTest is Test {
         });
     }
 
-    function _ensOp(bytes32 node, address dest)
-        internal
-        pure
-        returns (MigrationVault.Operation memory)
-    {
+    function _ensOp(bytes32 node, address dest) internal pure returns (MigrationVault.Operation memory) {
         return MigrationVault.Operation({
             opType: MigrationVault.OpType.ENS_TRANSFER,
             target: address(0),
@@ -203,11 +186,7 @@ contract MigrationVaultTest is Test {
         });
     }
 
-    function _revokeOp(address token, address spenderAddr)
-        internal
-        pure
-        returns (MigrationVault.Operation memory)
-    {
+    function _revokeOp(address token, address spenderAddr) internal pure returns (MigrationVault.Operation memory) {
         return MigrationVault.Operation({
             opType: MigrationVault.OpType.REVOKE_ERC20,
             target: token,
@@ -218,7 +197,7 @@ contract MigrationVaultTest is Test {
         });
     }
 
-    function test_Constructor_SetsImmutables() public view {
+    function test_Constructor_SetsImmutables() public {
         assertEq(vault.UNISWAP_ROUTER(), address(router));
         assertEq(vault.ENS_REGISTRY(), address(ens));
         assertEq(vault.USDC_ADDRESS(), address(tokenOut));
@@ -275,7 +254,6 @@ contract MigrationVaultTest is Test {
         assertEq(tokenOut.balanceOf(address(vault)), 0, "vault never receives tokenOut");
     }
 
-    
     function test_SwapAndTransfer_DefaultsToUsdcWhenCounterpartyIsZero() public {
         // counterparty = address(0) → vault should default tokenOut to USDC_ADDRESS
         MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
@@ -291,19 +269,12 @@ contract MigrationVaultTest is Test {
         MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
         ops[0] = _revokeOp(address(tokenIn), spender);
 
-        bytes memory expectedReason = abi.encodeWithSelector(
-            MigrationVault.RevocationHandledByFrontend.selector
-        );
+        bytes memory expectedReason = abi.encodeWithSelector(MigrationVault.RevocationHandledByFrontend.selector);
 
         uint256 expectedId = _expectedMigrationId(user, TS, 1);
         vm.expectEmit(true, true, true, true);
         emit MigrationVault.OperationExecuted(
-            expectedId,
-            0,
-            MigrationVault.OpType.REVOKE_ERC20,
-            address(0),
-            false,
-            expectedReason
+            expectedId, 0, MigrationVault.OpType.REVOKE_ERC20, address(0), false, expectedReason
         );
 
         _runMigration(ops);
@@ -335,7 +306,7 @@ contract MigrationVaultTest is Test {
         _runMigration(ops);
     }
 
-     // ─── multi-destination routing ──────────────────────────────────────────
+    // ─── multi-destination routing ──────────────────────────────────────────
 
     function test_MultiOpSameTx_RoutesToDifferentDestinations() public {
         MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](4);
@@ -383,7 +354,7 @@ contract MigrationVaultTest is Test {
         assertEq(tokenIn.balanceOf(destA), 50, "all 50 ops settled");
     }
 
-       // ─── lifecycle events ───────────────────────────────────────────────────
+    // ─── lifecycle events ───────────────────────────────────────────────────
 
     function test_EmitsLifecycleEventsInOrder() public {
         MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
@@ -395,18 +366,10 @@ contract MigrationVaultTest is Test {
         emit MigrationVault.MigrationStarted(user, expectedId, 1);
 
         vm.expectEmit(true, true, true, true);
-        emit MigrationVault.OperationExecuted(
-            expectedId,
-            0,
-            MigrationVault.OpType.TRANSFER_ERC20,
-            destA,
-            true,
-            ""
-        );
+        emit MigrationVault.OperationExecuted(expectedId, 0, MigrationVault.OpType.TRANSFER_ERC20, destA, true, "");
 
         vm.expectEmit(true, false, false, true);
         emit MigrationVault.MigrationCompleted(expectedId, 1, 1);
-
         _runMigration(ops);
     }
 
@@ -434,5 +397,4 @@ contract MigrationVaultTest is Test {
         assertEq(tokenIn.balanceOf(address(badVault)), 0, "vault holds no stuck dust");
         assertEq(tokenOut.balanceOf(destA), 0, "destA gets no USDC since swap failed");
     }
-
 }

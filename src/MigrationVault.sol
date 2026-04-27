@@ -155,7 +155,11 @@ contract MigrationVault {
     }
 
     // stub, since real revocation happens in the frontend as separate user-signed approve(spender,0) transactions
-    function _revokeErc20Handler(address /*token*/, address /*spender*/)
+    function _revokeErc20Handler(
+        address,
+        /*token*/
+        address /*spender*/
+    )
         internal
         pure
         returns (bool, bytes memory)
@@ -230,17 +234,20 @@ contract MigrationVault {
         }
 
         // swap - output token goes directly to destination
-        try IUniswapV3Router(UNISWAP_ROUTER).exactInputSingle(
-            IUniswapV3Router.ExactInputSingleParams({
-                tokenIn: tokenIn,
-                tokenOut: actualTokenOut,
-                fee: 3000, // 0.30% liquidity pool tier
-                recipient: destination,
-                amountIn: amountIn,
-                amountOutMinimum: 0, // no slippage protection
-                sqrtPriceLimitX96: 0 //no price limit
-            })
-        ) returns (uint256 /*amountOut*/) {
+        try IUniswapV3Router(UNISWAP_ROUTER)
+            .exactInputSingle(
+                IUniswapV3Router.ExactInputSingleParams({
+                    tokenIn: tokenIn,
+                    tokenOut: actualTokenOut,
+                    fee: 3000, // 0.30% liquidity pool tier
+                    recipient: destination,
+                    amountIn: amountIn,
+                    amountOutMinimum: 0, // no slippage protection
+                    sqrtPriceLimitX96: 0 //no price limit
+                })
+            ) returns (
+            uint256 /*amountOut*/
+        ) {
             return (true, "");
         } catch (bytes memory reason) {
             _refundDust(tokenIn, amountIn);

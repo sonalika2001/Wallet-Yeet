@@ -53,20 +53,20 @@ contract SeedDemoWallet is Script {
 
         vm.startBroadcast(demoKey);
 
-        MockERC20 usdc  = new MockERC20("Mock USDC", "USDC", 6, 1_000_000 * 10**6);
-        MockERC20 shib  = new MockERC20("Mock SHIB-PEPE", "SHIB-PEPE", 18, 1_000_000 ether);
-        MockERC20 gov   = new MockERC20("Mock Gov", "GOV", 18, 100_000 ether);
+        MockERC20 usdc = new MockERC20("Mock USDC", "USDC", 6, 1_000_000 * 10 ** 6);
+        MockERC20 shib = new MockERC20("Mock SHIB-PEPE", "SHIB-PEPE", 18, 1_000_000 ether);
+        MockERC20 gov = new MockERC20("Mock Gov", "GOV", 18, 100_000 ether);
         MockERC20 dustA = new MockERC20("Mock Dust A", "DUST-A", 18, 100 ether);
         MockERC20 dustB = new MockERC20("Mock Dust B", "DUST-B", 18, 50 ether);
 
         MockERC721 punks = new MockERC721("Mock CryptoPunks", "MPUNK", "ipfs://QmPunks/");
-        MockERC721 art   = new MockERC721("Mock Art Gallery", "MART", "ipfs://QmArt/");
-        
-        punks.mint(demoWallet);   // tokenId 1
-        punks.mint(demoWallet);   // tokenId 2
-        punks.mint(demoWallet);   // tokenId 3
-        art.mint(demoWallet);     // tokenId 1
-        art.mint(demoWallet);     // tokenId 2
+        MockERC721 art = new MockERC721("Mock Art Gallery", "MART", "ipfs://QmArt/");
+
+        punks.mint(demoWallet); // tokenId 1
+        punks.mint(demoWallet); // tokenId 2
+        punks.mint(demoWallet); // tokenId 3
+        art.mint(demoWallet); // tokenId 1
+        art.mint(demoWallet); // tokenId 2
 
         usdc.approve(SUSPICIOUS_ROUTER, type(uint256).max);
         shib.approve(SUSPICIOUS_ROUTER, type(uint256).max);
