@@ -335,4 +335,52 @@ contract MigrationVaultTest is Test {
         _runMigration(ops);
     }
 
+     // ─── multi-destination routing ──────────────────────────────────────────
+
+    function test_MultiOpSameTx_RoutesToDifferentDestinations() public {
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](4);
+        ops[0] = _erc20Op(address(tokenIn), destA, 100 ether);
+        ops[1] = _erc721Op(address(nft), destB, 1);
+        ops[2] = _erc721Op(address(nft), destA, 2);
+        ops[3] = _erc1155Op(address(multi), destB, 1, 40);
+
+        _runMigration(ops);
+
+        assertEq(tokenIn.balanceOf(destA), 100 ether);
+        assertEq(nft.ownerOf(1), destB);
+        assertEq(nft.ownerOf(2), destA);
+        assertEq(multi.balanceOf(destB, 1), 40);
+        assertEq(multi.balanceOf(user, 1), 60);
+    }
+
+    // ─── input validation ───────────────────────────────────────────────────
+
+    function test_RevertWhen_OperationsEmpty() public {
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](0);
+        vm.prank(user);
+        vm.expectRevert();
+        vault.executeMigration(ops);
+    }
+
+    function test_RevertWhen_OperationsExceedMax() public {
+        // 51 ops — one over MAX_OPS_PER_MIGRATION (50)
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](51);
+        for (uint256 i = 0; i < 51; i++) {
+            ops[i] = _erc20Op(address(tokenIn), destA, 1);
+        }
+        vm.prank(user);
+        vm.expectRevert();
+        vault.executeMigration(ops);
+    }
+
+    function test_AcceptsExactlyMaxOps() public {
+        // 50 should be allowed — the boundary
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](50);
+        for (uint256 i = 0; i < 50; i++) {
+            ops[i] = _erc20Op(address(tokenIn), destA, 1);
+        }
+        _runMigration(ops);
+        assertEq(tokenIn.balanceOf(destA), 50, "all 50 ops settled");
+    }
+
 }
