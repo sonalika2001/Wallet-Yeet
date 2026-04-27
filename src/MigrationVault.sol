@@ -97,10 +97,10 @@ contract MigrationVault {
     address public immutable usdcAddress;
     uint256 public constant MAX_OPS_PER_MIGRATION = 50;
 
-    error OperationFailed();
     error RevocationHandledByFrontend();
     error ApprovalFailed();
     error UnknownOperationType();
+    error TransferFromFailed();
 
     event MigrationStarted(address indexed from, uint256 indexed migrationId, uint256 opCount);
     event OperationExecuted(
@@ -119,7 +119,25 @@ contract MigrationVault {
         usdcAddress = _usdcAddress;
     }
 
-    function _executeOperation(Operation memory op)
+    function executeMigration(Operation[] calldata operations) external returns (uint256 migrationId){
+        
+        require(operations.length > 0 && operations.length <= MAX_OPS_PER_MIGRATION);
+        migrationId = uint256(keccak256(abi.encode(msg.sender,block.timestamp,operations.length)));
+        emit MigrationStarted(msg.sender, migrationId, operations.length);
+
+        uint256 successCount = 0;
+
+        for (uint256 i=0; i<operations.length; i++){
+            Operation calldata op = operations[i];
+            (bool success, bytes memory reason) = _executeOperation(op);
+            if (success) successCount++;
+            emit OperationExecuted(migrationId, i, op.opType, op.destination, success, reason);
+        }
+
+        emit MigrationCompleted(migrationId, successCount, operations.length);
+    }
+
+    function _executeOperation(Operation calldata op)
         internal
         returns (bool, bytes memory)
     {
@@ -132,11 +150,11 @@ contract MigrationVault {
         } else if (op.opType == OpType.TRANSFER_ERC1155) {
             return _transferERC1155Handler(op.target, op.destination, op.tokenId, op.amount);
         } else if (op.opType == OpType.ENS_TRANSFER) {
-            return _transferENS(op.tokenId, op.destination);
+            return _transferENSHandler(op.tokenId, op.destination);
         } else if (op.opType == OpType.SWAP_AND_TRANSFER) {
-            return _swapAndTransfer(op.target, op.amount, op.counterparty, op.destination);
+            return _swapAndTransferHandler(op.target, op.amount, op.counterparty, op.destination);
         }
-        else return (false, bytes(abi.encodeWithSelector(UnknownOperationType.selector)));
+        else return (false, abi.encodeWithSelector(UnknownOperationType.selector));
     }
 
     // stub, since real revocation happens in the frontend as separate user-signed approve(spender,0) transactions
@@ -149,7 +167,7 @@ contract MigrationVault {
         pure
         returns (bool, bytes memory)
     {
-        return (false, bytes(abi.encodeWithSelector(RevocationHandledByFrontend.selector)));
+        return (false, abi.encodeWithSelector(RevocationHandledByFrontend.selector));
     }
 
     function _transferERC20Handler(address token, address destination, uint256 amount)
@@ -167,7 +185,7 @@ contract MigrationVault {
         internal
         returns (bool, bytes memory)
     {
-        try IERC721(token).transferFrom(msg.sender, destination, tokenId) {
+        try IERC721(token).safeTransferFrom(msg.sender, destination, tokenId) {
             return (true, "");
         } catch (bytes memory reason) {
             return (false, reason);
@@ -185,7 +203,7 @@ contract MigrationVault {
         }
     }
 
-    function _transferENS(uint256 nodeAsUint, address newOwner) internal returns (bool, bytes memory) {
+    function _transferENSHandler(uint256 nodeAsUint, address newOwner) internal returns (bool, bytes memory) {
         bytes32 node = bytes32(nodeAsUint);
         try IENSRegistry(ensRegistry).setOwner(node, newOwner) {
             return (true, "");
@@ -194,15 +212,15 @@ contract MigrationVault {
         }
     }
 
-    function _swapAndTransfer(address tokenIn, uint256 amountIn, address tokenOut, address destination)
+    function _swapAndTransferHandler(address tokenIn, uint256 amountIn, address tokenOut, address destination)
         internal
         returns (bool, bytes memory)
     {
         address actualTokenOut = tokenOut == address(0) ? usdcAddress : tokenOut; // 0x0 means swap to USDC
 
         // pull dust from user -> vault
-        try IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn) returns (bool) {
-           
+        try IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn) returns (bool status) {
+           if (!status) return (false, abi.encodeWithSelector(TransferFromFailed.selector));
         } catch (bytes memory reason) {
             return (false, reason);
         }
@@ -211,7 +229,7 @@ contract MigrationVault {
         try IERC20(tokenIn).approve(uniswapRouter, amountIn) returns (bool status) {
             if (!status) {
                 _refundDust(tokenIn, amountIn);
-                return (false, bytes(abi.encodeWithSelector(ApprovalFailed.selector)));
+                return (false, abi.encodeWithSelector(ApprovalFailed.selector));
             }
         } catch (bytes memory reason) {
             _refundDust(tokenIn, amountIn);
