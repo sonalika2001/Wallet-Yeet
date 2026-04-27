@@ -75,18 +75,6 @@ contract MigrationVaultTest is Test {
     uint256 internal constant TS = 1_700_000_000;
     bytes32 internal constant TEST_NODE = keccak256("alice.walletyeet-demo.eth");
 
-    event MigrationStarted(address indexed from, uint256 indexed migrationId, uint256 opCount);
-    event OperationExecuted(
-        uint256 indexed migrationId,
-        uint256 opIndex,
-        MigrationVault.OpType opType,
-        address indexed destination,
-        bool success,
-        bytes reason
-    );
-    event MigrationCompleted(uint256 indexed migrationId, uint256 successCount, uint256 totalCount);
-
-
     function setUp() public {
         vm.warp(TS);
 
@@ -285,6 +273,66 @@ contract MigrationVaultTest is Test {
         assertEq(tokenOut.balanceOf(destA), 50 ether, "destA up 50 USDC (1:1 mock)");
         assertEq(tokenIn.balanceOf(address(vault)), 0, "vault holds no leftover dust");
         assertEq(tokenOut.balanceOf(address(vault)), 0, "vault never receives tokenOut");
+    }
+
+    
+    function test_SwapAndTransfer_DefaultsToUsdcWhenCounterpartyIsZero() public {
+        // counterparty = address(0) → vault should default tokenOut to USDC_ADDRESS
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
+        ops[0] = _swapOp(address(tokenIn), address(0), 25 ether, destA);
+
+        _runMigration(ops);
+
+        // tokenOut is the constructor-passed USDC address, so destA should get USDC
+        assertEq(tokenOut.balanceOf(destA), 25 ether, "0x0 counterparty - defaults to USDC");
+    }
+
+    function test_RevokeErc20_StubReturnsFalse() public {
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
+        ops[0] = _revokeOp(address(tokenIn), spender);
+
+        bytes memory expectedReason = abi.encodeWithSelector(
+            MigrationVault.RevocationHandledByFrontend.selector
+        );
+
+        uint256 expectedId = _expectedMigrationId(user, TS, 1);
+        vm.expectEmit(true, true, true, true);
+        emit MigrationVault.OperationExecuted(
+            expectedId,
+            0,
+            MigrationVault.OpType.REVOKE_ERC20,
+            address(0),
+            false,
+            expectedReason
+        );
+
+        _runMigration(ops);
+    }
+
+    function test_OneFailingOp_DoesNotRevertOthers() public {
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](2);
+        // op 0 transfers more than user has → fails inside try/catch
+        ops[0] = _erc20Op(address(tokenIn), destA, 10_000_000 ether);
+        // op 1 is a healthy 100 TIN transfer
+        ops[1] = _erc20Op(address(tokenIn), destB, 100 ether);
+
+        _runMigration(ops);
+
+        assertEq(tokenIn.balanceOf(destA), 0, "failed op leaves destA empty");
+        assertEq(tokenIn.balanceOf(destB), 100 ether, "good op still lands at destB");
+    }
+
+    function test_PartialFailure_EmitsCorrectSuccessCount() public {
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](3);
+        ops[0] = _erc20Op(address(tokenIn), destA, 10 ether); // ok
+        ops[1] = _erc20Op(address(tokenIn), destA, 10_000_000 ether); // fails
+        ops[2] = _erc20Op(address(tokenIn), destA, 5 ether); // ok
+
+        uint256 expectedId = _expectedMigrationId(user, TS, 3);
+        vm.expectEmit(true, false, false, true);
+        emit MigrationVault.MigrationCompleted(expectedId, 2, 3); // 2 successes out of 3
+
+        _runMigration(ops);
     }
 
 }
