@@ -218,7 +218,7 @@ contract MigrationVaultTest is Test {
         });
     }
 
-    function test_Constructor_SetsImmutables() public {
+    function test_Constructor_SetsImmutables() public view {
         assertEq(vault.UNISWAP_ROUTER(), address(router));
         assertEq(vault.ENS_REGISTRY(), address(ens));
         assertEq(vault.USDC_ADDRESS(), address(tokenOut));
@@ -381,6 +381,58 @@ contract MigrationVaultTest is Test {
         }
         _runMigration(ops);
         assertEq(tokenIn.balanceOf(destA), 50, "all 50 ops settled");
+    }
+
+       // ─── lifecycle events ───────────────────────────────────────────────────
+
+    function test_EmitsLifecycleEventsInOrder() public {
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
+        ops[0] = _erc20Op(address(tokenIn), destA, 100 ether);
+
+        uint256 expectedId = _expectedMigrationId(user, TS, 1);
+
+        vm.expectEmit(true, true, false, true);
+        emit MigrationVault.MigrationStarted(user, expectedId, 1);
+
+        vm.expectEmit(true, true, true, true);
+        emit MigrationVault.OperationExecuted(
+            expectedId,
+            0,
+            MigrationVault.OpType.TRANSFER_ERC20,
+            destA,
+            true,
+            ""
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit MigrationVault.MigrationCompleted(expectedId, 1, 1);
+
+        _runMigration(ops);
+    }
+
+    // ─── swap refund path ───────────────────────────────────────────────────
+
+    function test_SwapAndTransfer_RefundsOnSwapFailure() public {
+        // Re-deploy the vault pointing at a router that always reverts
+        RevertingUniswapRouter badRouter = new RevertingUniswapRouter();
+        MigrationVault badVault = new MigrationVault(address(badRouter), address(ens), address(tokenOut));
+
+        vm.prank(user);
+        tokenIn.approve(address(badVault), type(uint256).max);
+
+        uint256 userBefore = tokenIn.balanceOf(user);
+
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
+        ops[0] = _swapOp(address(tokenIn), address(tokenOut), 25 ether, destA);
+
+        vm.prank(user);
+        badVault.executeMigration(ops);
+
+        // The op fails, but _refundDust returns the dust to the user.
+        // Net: user balance unchanged, vault holds nothing, destA got nothing.
+        assertEq(tokenIn.balanceOf(user), userBefore, "user gets the dust refunded");
+        assertEq(tokenIn.balanceOf(address(badVault)), 0, "vault holds no stuck dust");
+        assertEq(tokenOut.balanceOf(destA), 0, "destA gets no USDC since swap failed");
     }
 
 }
