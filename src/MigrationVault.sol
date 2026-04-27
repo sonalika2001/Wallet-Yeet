@@ -91,9 +91,42 @@ contract MigrationVault {
         usdcAddress = _usdcAddress;
     }
 
+    function _executeOperation(uint256 migrationId, uint256 opIndex, Operation memory op) internal returns (bool, bytes memory){
+        if (op.opType == OpType.REVOKE_ERC20) {}
+        else if (op.opType == OpType.TRANSFER_ERC20){
+            return _transferERC20Handler(op.target, op.destination,op.amount);
+        }
+        else if (op.opType == OpType.TRANSFER_ERC721){
+            return _transferERC721Handler(op.target, op.destination, op.tokenId);
+        }
+        else if (op.opType == OpType.TRANSFER_ERC1155){
+            return _transferERC1155Handler(op.target, op.destination, op.tokenId, op.amount);
+        }
+        else if (op.opType == OpType.ENS_TRANSFER){}
+        else if (op.opType == OpType.SWAP_AND_TRANSFER){}
+    }
+
     function _transferERC20Handler(address token, address destination, uint256 amount) internal returns (bool,bytes memory){
         try IERC20(token).transferFrom(msg.sender,destination, amount) returns (bool status) {
             return (status,"");
+        }
+        catch (bytes memory reason){
+            return (false, reason);
+        }
+    }
+
+    function _transferERC721Handler(address token, address destination, uint256 tokenId) internal returns (bool,bytes memory){
+        try IERC721(token).transferFrom(msg.sender, destination, tokenId) {
+            return (true,"");
+        }
+        catch (bytes memory reason){
+            return (false, reason);
+        }
+    }
+
+    function _transferERC1155Handler(address token, address destination, uint256 tokenId, uint256 amount) internal returns (bool,bytes memory){
+        try IERC1155(token).safeTransferFrom(msg.sender, destination, tokenId, amount, "") {
+            return (true,"");
         }
         catch (bytes memory reason){
             return (false, reason);
