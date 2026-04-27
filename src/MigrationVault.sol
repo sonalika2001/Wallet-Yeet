@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 interface IENSRegistry {
     function setOwner(bytes32 node, address owner) external;
@@ -68,7 +68,7 @@ interface IUniswapV3Router {
 ///      | TRANSFER_ERC20    | ERC20 contract    | —              | —             | base units    | recipient    |
 ///      | TRANSFER_ERC721   | ERC721 contract   | —              | tokenId       | —             | recipient    |
 ///      | TRANSFER_ERC1155  | ERC1155 contract  | —              | tokenId       | qty           | recipient    |
-///      | ENS_TRANSFER      | (use ensRegistry) | —              | uint256(node) | —             | new ENS owner|
+///      | ENS_TRANSFER      | (use ENS_REGISTRY)| —              | uint256(node) | —             | new ENS owner|
 ///      | SWAP_AND_TRANSFER | tokenIn (ERC20)   | tokenOut (USDC | —             | amountIn      | recipient    |
 ///      |                   |                   |  if address(0))|               |               |              |
 ///
@@ -92,9 +92,9 @@ contract MigrationVault {
         address destination; // per-op recipient wallet
     }
 
-    address public immutable uniswapRouter;
-    address public immutable ensRegistry;
-    address public immutable usdcAddress;
+    address public immutable UNISWAP_ROUTER;
+    address public immutable ENS_REGISTRY;
+    address public immutable USDC_ADDRESS;
     uint256 public constant MAX_OPS_PER_MIGRATION = 50;
 
     error RevocationHandledByFrontend();
@@ -114,20 +114,19 @@ contract MigrationVault {
     event MigrationCompleted(uint256 indexed migrationId, uint256 successCount, uint256 totalCount);
 
     constructor(address _uniswapRouter, address _ensRegistry, address _usdcAddress) {
-        uniswapRouter = _uniswapRouter;
-        ensRegistry = _ensRegistry;
-        usdcAddress = _usdcAddress;
+        UNISWAP_ROUTER = _uniswapRouter;
+        ENS_REGISTRY = _ensRegistry;
+        USDC_ADDRESS = _usdcAddress;
     }
 
-    function executeMigration(Operation[] calldata operations) external returns (uint256 migrationId){
-        
+    function executeMigration(Operation[] calldata operations) external returns (uint256 migrationId) {
         require(operations.length > 0 && operations.length <= MAX_OPS_PER_MIGRATION);
-        migrationId = uint256(keccak256(abi.encode(msg.sender,block.timestamp,operations.length)));
+        migrationId = uint256(keccak256(abi.encode(msg.sender, block.timestamp, operations.length)));
         emit MigrationStarted(msg.sender, migrationId, operations.length);
 
         uint256 successCount = 0;
 
-        for (uint256 i=0; i<operations.length; i++){
+        for (uint256 i = 0; i < operations.length; i++) {
             Operation calldata op = operations[i];
             (bool success, bytes memory reason) = _executeOperation(op);
             if (success) successCount++;
@@ -137,32 +136,26 @@ contract MigrationVault {
         emit MigrationCompleted(migrationId, successCount, operations.length);
     }
 
-    function _executeOperation(Operation calldata op)
-        internal
-        returns (bool, bytes memory)
-    {
+    function _executeOperation(Operation calldata op) internal returns (bool, bytes memory) {
         if (op.opType == OpType.REVOKE_ERC20) {
-            return _revokeERC20Handler(op.target, op.counterparty);
+            return _revokeErc20Handler(op.target, op.counterparty);
         } else if (op.opType == OpType.TRANSFER_ERC20) {
-            return _transferERC20Handler(op.target, op.destination, op.amount);
+            return _transferErc20Handler(op.target, op.destination, op.amount);
         } else if (op.opType == OpType.TRANSFER_ERC721) {
-            return _transferERC721Handler(op.target, op.destination, op.tokenId);
+            return _transferErc721Handler(op.target, op.destination, op.tokenId);
         } else if (op.opType == OpType.TRANSFER_ERC1155) {
-            return _transferERC1155Handler(op.target, op.destination, op.tokenId, op.amount);
+            return _transferErc1155Handler(op.target, op.destination, op.tokenId, op.amount);
         } else if (op.opType == OpType.ENS_TRANSFER) {
-            return _transferENSHandler(op.tokenId, op.destination);
+            return _transferEnsHandler(op.tokenId, op.destination);
         } else if (op.opType == OpType.SWAP_AND_TRANSFER) {
             return _swapAndTransferHandler(op.target, op.amount, op.counterparty, op.destination);
+        } else {
+            return (false, abi.encodeWithSelector(UnknownOperationType.selector));
         }
-        else return (false, abi.encodeWithSelector(UnknownOperationType.selector));
     }
 
     // stub, since real revocation happens in the frontend as separate user-signed approve(spender,0) transactions
-    function _revokeERC20Handler(
-        address,
-        /*token*/
-        address /*spender*/
-    )
+    function _revokeErc20Handler(address /*token*/, address /*spender*/)
         internal
         pure
         returns (bool, bytes memory)
@@ -170,7 +163,7 @@ contract MigrationVault {
         return (false, abi.encodeWithSelector(RevocationHandledByFrontend.selector));
     }
 
-    function _transferERC20Handler(address token, address destination, uint256 amount)
+    function _transferErc20Handler(address token, address destination, uint256 amount)
         internal
         returns (bool, bytes memory)
     {
@@ -181,7 +174,7 @@ contract MigrationVault {
         }
     }
 
-    function _transferERC721Handler(address token, address destination, uint256 tokenId)
+    function _transferErc721Handler(address token, address destination, uint256 tokenId)
         internal
         returns (bool, bytes memory)
     {
@@ -192,7 +185,7 @@ contract MigrationVault {
         }
     }
 
-    function _transferERC1155Handler(address token, address destination, uint256 tokenId, uint256 amount)
+    function _transferErc1155Handler(address token, address destination, uint256 tokenId, uint256 amount)
         internal
         returns (bool, bytes memory)
     {
@@ -203,9 +196,9 @@ contract MigrationVault {
         }
     }
 
-    function _transferENSHandler(uint256 nodeAsUint, address newOwner) internal returns (bool, bytes memory) {
+    function _transferEnsHandler(uint256 nodeAsUint, address newOwner) internal returns (bool, bytes memory) {
         bytes32 node = bytes32(nodeAsUint);
-        try IENSRegistry(ensRegistry).setOwner(node, newOwner) {
+        try IENSRegistry(ENS_REGISTRY).setOwner(node, newOwner) {
             return (true, "");
         } catch (bytes memory reason) {
             return (false, reason);
@@ -216,17 +209,17 @@ contract MigrationVault {
         internal
         returns (bool, bytes memory)
     {
-        address actualTokenOut = tokenOut == address(0) ? usdcAddress : tokenOut; // 0x0 means swap to USDC
+        address actualTokenOut = tokenOut == address(0) ? USDC_ADDRESS : tokenOut; // 0x0 means swap to USDC
 
         // pull dust from user -> vault
         try IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn) returns (bool status) {
-           if (!status) return (false, abi.encodeWithSelector(TransferFromFailed.selector));
+            if (!status) return (false, abi.encodeWithSelector(TransferFromFailed.selector));
         } catch (bytes memory reason) {
             return (false, reason);
         }
 
         // approve router to spend tokenIn
-        try IERC20(tokenIn).approve(uniswapRouter, amountIn) returns (bool status) {
+        try IERC20(tokenIn).approve(UNISWAP_ROUTER, amountIn) returns (bool status) {
             if (!status) {
                 _refundDust(tokenIn, amountIn);
                 return (false, abi.encodeWithSelector(ApprovalFailed.selector));
@@ -237,20 +230,17 @@ contract MigrationVault {
         }
 
         // swap - output token goes directly to destination
-        try IUniswapV3Router(uniswapRouter)
-            .exactInputSingle(
-                IUniswapV3Router.ExactInputSingleParams({
-                    tokenIn: tokenIn,
-                    tokenOut: actualTokenOut,
-                    fee: 3000, // 0.30% liquidity pool tier
-                    recipient: destination,
-                    amountIn: amountIn,
-                    amountOutMinimum: 0, // no slippage protection
-                    sqrtPriceLimitX96: 0 //no price limit
-                })
-            ) returns (
-            uint256 /*amountOut*/
-        ) {
+        try IUniswapV3Router(UNISWAP_ROUTER).exactInputSingle(
+            IUniswapV3Router.ExactInputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: actualTokenOut,
+                fee: 3000, // 0.30% liquidity pool tier
+                recipient: destination,
+                amountIn: amountIn,
+                amountOutMinimum: 0, // no slippage protection
+                sqrtPriceLimitX96: 0 //no price limit
+            })
+        ) returns (uint256 /*amountOut*/) {
             return (true, "");
         } catch (bytes memory reason) {
             _refundDust(tokenIn, amountIn);
