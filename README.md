@@ -2,6 +2,8 @@
 
 > Yeet your wallet. Three AI agents handle the rest.
 
+> **AI usage disclaimer.** Anthropic's Claude was used as a coding assistant for parts of this project. AI-written contributions are either (a) committed under an AI-authored commit (e.g. project scaffolding, installation, generated boilerplate) or (b) marked inline with a `<Written by AI.>` annotation in the relevant file. Everything else is human-written.
+
 ## What is this?
 
 WalletYeet is an AI-orchestrated wallet migration tool with **three specialized agents** working together: Scout discovers your assets, Auditor scores risks, Planner builds a safe migration plan. You stay in control — pick what migrates, choose multiple destinations, set your strategy. After a one-time approval per asset, a single bundled migration transaction does the rest, with transparent per-operation reporting.
