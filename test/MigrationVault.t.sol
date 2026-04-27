@@ -397,4 +397,37 @@ contract MigrationVaultTest is Test {
         assertEq(tokenIn.balanceOf(address(badVault)), 0, "vault holds no stuck dust");
         assertEq(tokenOut.balanceOf(destA), 0, "destA gets no USDC since swap failed");
     }
+
+    // ─── fuzz ───────────────────────────────────────────────────────────────
+
+    function testFuzz_MigrationIdVariesByTimestamp(uint256 ts1, uint256 ts2) public {
+        // Bound away from 0 / overflow 
+        ts1 = bound(ts1, 1, 2 ** 64);
+        ts2 = bound(ts2, 1, 2 ** 64);
+        vm.assume(ts1 != ts2);
+
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
+        ops[0] = _erc20Op(address(tokenIn), destA, 1);
+
+        vm.warp(ts1);
+        vm.prank(user);
+        uint256 id1 = vault.executeMigration(ops);
+
+        vm.warp(ts2);
+        vm.prank(user);
+        uint256 id2 = vault.executeMigration(ops);
+
+        assertTrue(id1 != id2, "different timestamps should produce different ids");
+    }
+
+    function testFuzz_TransferErc20_ArbitraryAmount(uint256 amount) public {
+        amount = bound(amount, 1, 1_000 ether); // user has 1000 TIN
+        MigrationVault.Operation[] memory ops = new MigrationVault.Operation[](1);
+        ops[0] = _erc20Op(address(tokenIn), destA, amount);
+
+        _runMigration(ops);
+
+        assertEq(tokenIn.balanceOf(destA), amount);
+        assertEq(tokenIn.balanceOf(user), 1_000 ether - amount);
+    }
 }
