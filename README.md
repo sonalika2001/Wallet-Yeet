@@ -4,7 +4,7 @@
 
 ## What is this?
 
-WalletYeet is an AI-orchestrated wallet migration tool with **three specialized agents** working together: Scout discovers your assets, Auditor scores risks, Planner builds a safe migration plan. You stay in control — pick what migrates, choose multiple destinations, set your strategy. One signature, one transaction, with transparent per-operation reporting.
+WalletYeet is an AI-orchestrated wallet migration tool with **three specialized agents** working together: Scout discovers your assets, Auditor scores risks, Planner builds a safe migration plan. You stay in control — pick what migrates, choose multiple destinations, set your strategy. After a one-time approval per asset, a single bundled migration transaction does the rest, with transparent per-operation reporting.
 
 ## The Problem
 
@@ -28,7 +28,7 @@ It's tedious, error-prone, and incomplete. The result: stale wallets full of ris
    ⚠️ Auditor scores risks
    📋 Planner builds the safe migration sequence
 4. You review and customize (per-asset selection, dust conversion toggle, scheduling)
-5. Sign one transaction
+5. Approve each asset, then sign the bundled migration transaction
 6. Watch each operation execute, with transparent success/failure reporting
 ```
 
@@ -39,7 +39,7 @@ It's tedious, error-prone, and incomplete. The result: stale wallets full of ris
 - **Per-asset control** — keep what you want where you want it
 - **Dust auto-conversion** — sub-$1 tokens get swapped to USDC via Uniswap (saves abandoned value)
 - **ENS-aware** — properly migrates subnames and resolver settings
-- **Batched execution** — one signature, one transaction, with transparent per-operation reporting (resilient: one weird asset doesn't break the whole migration)
+- **Batched execution** — every transfer bundled into one migration transaction, with transparent per-operation reporting (resilient: one weird asset doesn't break the whole migration)
 - **Optional scheduling** — defer migration to when gas is cheap
 - **Audit trail** — verifiable on-chain log of what moved when
 
@@ -81,6 +81,33 @@ User → Frontend → Three Agents (Scout/Auditor/Planner)
                   • ENS subname transfers
                   • Uniswap dust conversions
 ```
+
+## Gas Optimization
+
+The biggest gas optimization in WalletYeet is the architecture itself: instead of N separate transfer transactions, the migration runs as **one batched `executeMigration` call**. For a typical demo wallet with 12 assets:
+
+| Path | Total gas | Transactions |
+|---|---|---|
+| Manual (12 separate transfers) | ~1,090,000 | 12 |
+| WalletYeet (one `executeMigration`) | ~680,000 | 1 |
+
+**~410,000 gas saved**, almost entirely from skipping the per-tx 21,000-gas base cost twelve times. Plus: one mempool entry, one nonce, one confirmation to wait for instead of twelve.
+
+Also baked into the v1 contract:
+
+- `immutable` state variables for router/registry addresses (~3 gas per read vs ~2,100 for storage)
+- `calldata` operations array (no memory copy)
+- Per-operation `try/catch` so one failing asset doesn't waste the gas of the rest
+- No separate audit-log contract call — events emit directly from the vault
+
+For mainnet, the bigger wins live in the roadmap:
+
+- **EIP-7702** to bundle the prerequisite approvals into the same transaction — saves another ~900,000 gas per migration (~13 approval txs each avoiding 21k base + ~50k for `approve`)
+- **L2 deployment** (Base, Arbitrum, Optimism) for the same gas units at 10–100× cheaper real cost
+- **EIP-2612 `permit()`** to convert ERC-20 approvals from on-chain txs into free off-chain typed-data signatures
+- **Gas-aware dust threshold** — only swap dust when its value exceeds the gas cost (avoids the mainnet trap of paying $20 in gas to swap $0.40 of dust)
+
+Sepolia gas is free, so the v1 demo doesn't *need* these optimizations — but the architecture is set up so they slot in cleanly when targeting mainnet.
 
 ## Status
 
