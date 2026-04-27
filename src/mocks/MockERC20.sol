@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// <Description written by AI.>
+/// <NatSpec written by AI.>
 /// @title MockERC20 — generic configurable ERC-20 for the demo wallet
 /// @notice ONE contract, deployed N times with different constructor params.
 ///         Replaces what would have been MockUSDC / MockShitcoin / MockGov /
