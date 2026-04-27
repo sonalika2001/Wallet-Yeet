@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
+/// <Description written by AI.>
 /// @title MockERC721 — generic configurable ERC-721 for the demo wallet
 /// @notice ONE contract, deployed twice (Punks + Art) with different
 ///         name / symbol / baseURI. Replaces MockPunks + MockArt.
