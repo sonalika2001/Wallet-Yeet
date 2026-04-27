@@ -98,6 +98,9 @@ contract MigrationVault {
     uint256 public constant MAX_OPS_PER_MIGRATION = 50;
 
     error OperationFailed();
+    error RevocationHandledByFrontend();
+    error ApprovalFailed();
+    error UnknownOperationType();
 
     event MigrationStarted(address indexed from, uint256 indexed migrationId, uint256 opCount);
     event OperationExecuted(
@@ -116,17 +119,37 @@ contract MigrationVault {
         usdcAddress = _usdcAddress;
     }
 
-    function _executeOperation(uint256 migrationId, uint256 opIndex, Operation memory op)
+    function _executeOperation(Operation memory op)
         internal
         returns (bool, bytes memory)
     {
-        if (op.opType == OpType.REVOKE_ERC20) {} else if (op.opType == OpType.TRANSFER_ERC20) {
+        if (op.opType == OpType.REVOKE_ERC20) {
+            return _revokeERC20Handler(op.target, op.counterparty);
+        } else if (op.opType == OpType.TRANSFER_ERC20) {
             return _transferERC20Handler(op.target, op.destination, op.amount);
         } else if (op.opType == OpType.TRANSFER_ERC721) {
             return _transferERC721Handler(op.target, op.destination, op.tokenId);
         } else if (op.opType == OpType.TRANSFER_ERC1155) {
             return _transferERC1155Handler(op.target, op.destination, op.tokenId, op.amount);
-        } else if (op.opType == OpType.ENS_TRANSFER) {} else if (op.opType == OpType.SWAP_AND_TRANSFER) {}
+        } else if (op.opType == OpType.ENS_TRANSFER) {
+            return _transferENS(op.tokenId, op.destination);
+        } else if (op.opType == OpType.SWAP_AND_TRANSFER) {
+            return _swapAndTransfer(op.target, op.amount, op.counterparty, op.destination);
+        }
+        else return (false, bytes(abi.encodeWithSelector(UnknownOperationType.selector)));
+    }
+
+    // stub, since real revocation happens in the frontend as separate user-signed approve(spender,0) transactions
+    function _revokeERC20Handler(
+        address,
+        /*token*/
+        address /*spender*/
+    )
+        internal
+        pure
+        returns (bool, bytes memory)
+    {
+        return (false, bytes(abi.encodeWithSelector(RevocationHandledByFrontend.selector)));
     }
 
     function _transferERC20Handler(address token, address destination, uint256 amount)
@@ -160,5 +183,66 @@ contract MigrationVault {
         } catch (bytes memory reason) {
             return (false, reason);
         }
+    }
+
+    function _transferENS(uint256 nodeAsUint, address newOwner) internal returns (bool, bytes memory) {
+        bytes32 node = bytes32(nodeAsUint);
+        try IENSRegistry(ensRegistry).setOwner(node, newOwner) {
+            return (true, "");
+        } catch (bytes memory reason) {
+            return (false, reason);
+        }
+    }
+
+    function _swapAndTransfer(address tokenIn, uint256 amountIn, address tokenOut, address destination)
+        internal
+        returns (bool, bytes memory)
+    {
+        address actualTokenOut = tokenOut == address(0) ? usdcAddress : tokenOut; // 0x0 means swap to USDC
+
+        // pull dust from user -> vault
+        try IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn) returns (bool) {
+           
+        } catch (bytes memory reason) {
+            return (false, reason);
+        }
+
+        // approve router to spend tokenIn
+        try IERC20(tokenIn).approve(uniswapRouter, amountIn) returns (bool status) {
+            if (!status) {
+                _refundDust(tokenIn, amountIn);
+                return (false, bytes(abi.encodeWithSelector(ApprovalFailed.selector)));
+            }
+        } catch (bytes memory reason) {
+            _refundDust(tokenIn, amountIn);
+            return (false, reason);
+        }
+
+        // swap - output token goes directly to destination
+        try IUniswapV3Router(uniswapRouter)
+            .exactInputSingle(
+                IUniswapV3Router.ExactInputSingleParams({
+                    tokenIn: tokenIn,
+                    tokenOut: actualTokenOut,
+                    fee: 3000, // 0.30% liquidity pool tier
+                    recipient: destination,
+                    amountIn: amountIn,
+                    amountOutMinimum: 0, // no slippage protection
+                    sqrtPriceLimitX96: 0 //no price limit
+                })
+            ) returns (
+            uint256 /*amountOut*/
+        ) {
+            return (true, "");
+        } catch (bytes memory reason) {
+            _refundDust(tokenIn, amountIn);
+            return (false, reason);
+        }
+    }
+
+    /// @dev Best-effort refund of dust that the vault pulled but couldn't swap.
+    ///      If the refund itself fails, the dust is stuck — known edge case for v1.
+    function _refundDust(address token, uint256 amount) internal {
+        try IERC20(token).transfer(msg.sender, amount) {} catch {}
     }
 }
