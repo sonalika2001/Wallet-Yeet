@@ -5,6 +5,23 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
+interface IENSRegistry {
+    function setOwner(bytes32 node, address owner) external;
+}
+
+interface IUniswapV3Router {
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+    }
+    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
+}
+
 /// <NatSpec written by AI.>
 /// @title MigrationVault — WalletYeet's core multicall executor
 ///
@@ -56,19 +73,25 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 ///      |                   |                   |  if address(0))|               |               |              |
 ///
 contract MigrationVault {
-
-    enum OpType {REVOKE_ERC20, TRANSFER_ERC20, TRANSFER_ERC721, TRANSFER_ERC1155, ENS_TRANSFER, SWAP_AND_TRANSFER}
+    enum OpType {
+        REVOKE_ERC20,
+        TRANSFER_ERC20,
+        TRANSFER_ERC721,
+        TRANSFER_ERC1155,
+        ENS_TRANSFER,
+        SWAP_AND_TRANSFER
+    }
 
     // <struct defined by AI.>
     struct Operation {
-      OpType opType;        // which kind of op (TRANSFER_ERC20, etc.)
-      address target;       // contract to interact with (token, ENS reg, router)
-      address counterparty; // REVOKE: spender. SWAP: tokenOut. Else: unused.
-      uint256 tokenId;      // NFT: tokenId. ENS: uint256(node). Else: 0.
-      uint256 amount;       // fungible amount, OR swap amountIn
-      address destination;  // per-op recipient wallet
-  }
-    
+        OpType opType; // which kind of op (TRANSFER_ERC20, etc.)
+        address target; // contract to interact with (token, ENS reg, router)
+        address counterparty; // REVOKE: spender. SWAP: tokenOut. Else: unused.
+        uint256 tokenId; // NFT: tokenId. ENS: uint256(node). Else: 0.
+        uint256 amount; // fungible amount, OR swap amountIn
+        address destination; // per-op recipient wallet
+    }
+
     address public immutable uniswapRouter;
     address public immutable ensRegistry;
     address public immutable usdcAddress;
@@ -77,60 +100,65 @@ contract MigrationVault {
     error OperationFailed();
 
     event MigrationStarted(address indexed from, uint256 indexed migrationId, uint256 opCount);
-    event OperationExecuted(uint256 indexed migrationId,
-      uint256 opIndex,
-      OpType opType,
-      address indexed destination,
-      bool success,
-      bytes reason);
+    event OperationExecuted(
+        uint256 indexed migrationId,
+        uint256 opIndex,
+        OpType opType,
+        address indexed destination,
+        bool success,
+        bytes reason
+    );
     event MigrationCompleted(uint256 indexed migrationId, uint256 successCount, uint256 totalCount);
-    
-    constructor(address _uniswapRouter, address _ensRegistry, address _usdcAddress){
+
+    constructor(address _uniswapRouter, address _ensRegistry, address _usdcAddress) {
         uniswapRouter = _uniswapRouter;
         ensRegistry = _ensRegistry;
         usdcAddress = _usdcAddress;
     }
 
-    function _executeOperation(uint256 migrationId, uint256 opIndex, Operation memory op) internal returns (bool, bytes memory){
-        if (op.opType == OpType.REVOKE_ERC20) {}
-        else if (op.opType == OpType.TRANSFER_ERC20){
-            return _transferERC20Handler(op.target, op.destination,op.amount);
-        }
-        else if (op.opType == OpType.TRANSFER_ERC721){
+    function _executeOperation(uint256 migrationId, uint256 opIndex, Operation memory op)
+        internal
+        returns (bool, bytes memory)
+    {
+        if (op.opType == OpType.REVOKE_ERC20) {} else if (op.opType == OpType.TRANSFER_ERC20) {
+            return _transferERC20Handler(op.target, op.destination, op.amount);
+        } else if (op.opType == OpType.TRANSFER_ERC721) {
             return _transferERC721Handler(op.target, op.destination, op.tokenId);
-        }
-        else if (op.opType == OpType.TRANSFER_ERC1155){
+        } else if (op.opType == OpType.TRANSFER_ERC1155) {
             return _transferERC1155Handler(op.target, op.destination, op.tokenId, op.amount);
-        }
-        else if (op.opType == OpType.ENS_TRANSFER){}
-        else if (op.opType == OpType.SWAP_AND_TRANSFER){}
+        } else if (op.opType == OpType.ENS_TRANSFER) {} else if (op.opType == OpType.SWAP_AND_TRANSFER) {}
     }
 
-    function _transferERC20Handler(address token, address destination, uint256 amount) internal returns (bool,bytes memory){
-        try IERC20(token).transferFrom(msg.sender,destination, amount) returns (bool status) {
-            return (status,"");
-        }
-        catch (bytes memory reason){
+    function _transferERC20Handler(address token, address destination, uint256 amount)
+        internal
+        returns (bool, bytes memory)
+    {
+        try IERC20(token).transferFrom(msg.sender, destination, amount) returns (bool status) {
+            return (status, "");
+        } catch (bytes memory reason) {
             return (false, reason);
         }
     }
 
-    function _transferERC721Handler(address token, address destination, uint256 tokenId) internal returns (bool,bytes memory){
+    function _transferERC721Handler(address token, address destination, uint256 tokenId)
+        internal
+        returns (bool, bytes memory)
+    {
         try IERC721(token).transferFrom(msg.sender, destination, tokenId) {
-            return (true,"");
-        }
-        catch (bytes memory reason){
+            return (true, "");
+        } catch (bytes memory reason) {
             return (false, reason);
         }
     }
 
-    function _transferERC1155Handler(address token, address destination, uint256 tokenId, uint256 amount) internal returns (bool,bytes memory){
+    function _transferERC1155Handler(address token, address destination, uint256 tokenId, uint256 amount)
+        internal
+        returns (bool, bytes memory)
+    {
         try IERC1155(token).safeTransferFrom(msg.sender, destination, tokenId, amount, "") {
-            return (true,"");
-        }
-        catch (bytes memory reason){
+            return (true, "");
+        } catch (bytes memory reason) {
             return (false, reason);
         }
     }
-
 }
