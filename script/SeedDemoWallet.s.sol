@@ -86,7 +86,7 @@ contract SeedDemoWallet is Script {
         console.log("Punks     :", address(punks));
         console.log("Art       :", address(art));
         console.log("");
-        console.log("Next: copy these into frontend/lib/contracts.ts");
+        console.log("Next: copy these into dapp/lib/contracts.ts");
         console.log("Next: register ENS subnames manually at app.ens.domains");
     }
 }
