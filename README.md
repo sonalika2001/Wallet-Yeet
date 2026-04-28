@@ -58,7 +58,7 @@ WalletYeet is the first crypto **reorganization** tool, not just a migration too
 
 - **Smart Contracts**: Solidity / Foundry
 - **Frontend**: Next.js + TypeScript + wagmi + viem
-- **AI Agents**: Anthropic Claude (Scout/Auditor/Planner pipeline)
+- **AI Agents**: GPT-4o-mini via Microsoft Foundry (Scout/Auditor/Planner pipeline)
 - **Asset Discovery**: Alchemy SDK
 - **Execution Layer**: KeeperHub (MCP server, retry logic, MEV protection)
 - **DEX Routing**: Uniswap V3 Universal Router (dust auto-conversion)
