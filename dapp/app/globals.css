@@ -1,0 +1,239 @@
+//<Written by AI.>
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-display: "Fraunces", "Playfair Display", serif;
+  --font-pixel: "Press Start 2P", "VT323", ui-monospace, monospace;
+}
+
+html,
+body {
+  background: #fff7f0;
+  color: #1a1733;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ========= cute background scaffolding ========= */
+
+.bg-yeet {
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(255, 200, 168, 0.55), transparent 60%),
+    radial-gradient(1000px 500px at -10% 10%, rgba(184, 220, 255, 0.5), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(216, 197, 255, 0.5), transparent 60%),
+    #fff7f0;
+}
+
+.dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(131, 72, 255, 0.18) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+/* ========= pixel-art helpers ========= */
+
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+.crt-overlay {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.crt-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(0, 0, 0, 0.04) 100%
+  );
+  background-size: 100% 4px;
+  z-index: 2;
+  opacity: 0.5;
+}
+
+/* ========= pop-button (chunky pixel feel, light theme) ========= */
+
+.btn-pop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.1rem;
+  border-radius: 14px;
+  border: 2px solid #1a1733;
+  background: #ffffff;
+  color: #1a1733;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 4px 4px 0 0 #1a1733;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  user-select: none;
+  white-space: nowrap;
+}
+.btn-pop:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 0 #1a1733;
+}
+.btn-pop:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 0 #1a1733;
+}
+.btn-pop:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 4px 4px 0 0 #1a1733;
+}
+.btn-pop--primary {
+  background: linear-gradient(135deg, #ffb088 0%, #ff7a3d 100%);
+  color: #1a1733;
+}
+.btn-pop--mint {
+  background: linear-gradient(135deg, #9be9c4 0%, #3fcd8a 100%);
+}
+.btn-pop--sky {
+  background: linear-gradient(135deg, #9bcdff 0%, #3f9cff 100%);
+}
+.btn-pop--lilac {
+  background: linear-gradient(135deg, #ccb1ff 0%, #9c6cff 100%);
+}
+.btn-pop--ghost {
+  background: transparent;
+}
+
+/* ========= cards ========= */
+
+.card-pop {
+  border: 2px solid #1a1733;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 0 0 0 transparent, 6px 6px 0 0 #1a1733;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.card-pop:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 7px 7px 0 0 #1a1733;
+}
+
+.card-soft {
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(26, 23, 51, 0.14);
+  box-shadow: 0 12px 30px -16px rgba(131, 72, 255, 0.25);
+}
+
+/* ========= status pills ========= */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1.5px solid #1a1733;
+}
+.pill--safe {
+  background: #e8fbf3;
+  color: #1fb370;
+}
+.pill--suspicious {
+  background: #fff1e6;
+  color: #c2570c;
+}
+.pill--dangerous {
+  background: #ffe1ec;
+  color: #c8225b;
+}
+.pill--info {
+  background: #e8f4ff;
+  color: #1f7fe8;
+}
+.pill--lilac {
+  background: #f4ecff;
+  color: #8348ff;
+}
+
+/* ========= shimmer loading bar ========= */
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 122, 61, 0) 0%,
+    rgba(255, 122, 61, 0.4) 50%,
+    rgba(255, 122, 61, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ========= scrollbar (light) ========= */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ccb1ff transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #ccb1ff;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ========= sparkles (decorative) ========= */
+
+.sparkle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(255, 200, 100, 0.7));
+}
+
+/* ========= tiny gradient text ========= */
+
+.text-gradient {
+  background: linear-gradient(135deg, #ff7a3d 0%, #9c6cff 50%, #1f7fe8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ========= rainbow connect button override (RainbowKit reset) ========= */
+[data-rk] {
+  --rk-radii-actionButton: 14px;
+  --rk-radii-connectButton: 14px;
+  --rk-radii-modal: 22px;
+  --rk-fonts-body: var(--font-sans);
+}
