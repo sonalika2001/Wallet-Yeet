@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 // Mid-yeet pixel astronaut — pure SVG so it scales crisp at any size
 // without bringing in an asset pipeline. Eyes blink and arms wiggle on
 // hover. The visor reflects the WalletYeet brand gradient.
+// <Written by AI.>
 export function Mascot({
   size = 160,
   yeeting = false,
