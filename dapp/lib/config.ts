@@ -23,7 +23,8 @@ export type Strategy = (typeof STRATEGY_PRESETS)[number];
 export const SEPOLIA_CHAIN_ID = 11155111;
 
 export const APP_NAME = "WalletYeet";
-export const APP_TAGLINE = "Yeet that wallet. Don't bail — yeet.";
+export const APP_TAGLINE =
+  "Yeet your wallet — AI agents discover, audit, plan; you route, we yeet.";
 
 // True if the server has Azure OpenAI + Alchemy keys to run the real pipeline.
 // Used by API routes to decide whether to fall back to mock data.
