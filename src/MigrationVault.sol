@@ -63,14 +63,14 @@ interface IUniswapV3Router {
 ///      Uniswap fee tier: hard-coded 0.30% (3000) for hackathon scope.
 ///
 /// @dev Operation field semantics:
-///      | opType            | target            | counterparty   | tokenId       | amount        | destination  |
-///      | REVOKE_ERC20      | ERC20 contract    | spender to nuke| —             | —             | —            |
-///      | TRANSFER_ERC20    | ERC20 contract    | —              | —             | base units    | recipient    |
-///      | TRANSFER_ERC721   | ERC721 contract   | —              | tokenId       | —             | recipient    |
-///      | TRANSFER_ERC1155  | ERC1155 contract  | —              | tokenId       | qty           | recipient    |
-///      | ENS_TRANSFER      | (use ENS_REGISTRY)| —              | uint256(node) | —             | new ENS owner|
-///      | SWAP_AND_TRANSFER | tokenIn (ERC20)   | tokenOut (USDC | —             | amountIn      | recipient    |
-///      |                   |                   |  if address(0))|               |               |              |
+///      | opType            | target            | counterparty    | tokenId        | amount        | destination  |
+///      | REVOKE_ERC20      | ERC20 contract    | spender to nuke | —              | —             | —            |
+///      | TRANSFER_ERC20    | ERC20 contract    | —               | —              | base units    | recipient    |
+///      | TRANSFER_ERC721   | ERC721 contract   | —               | tokenId        | —             | recipient    |
+///      | TRANSFER_ERC1155  | ERC1155 contract  | —               | tokenId        | qty           | recipient    |
+///      | ENS_TRANSFER      | (use ENS_REGISTRY)| —               | uint256(node)  | —             | new ENS owner|
+///      | SWAP_AND_TRANSFER | tokenIn (ERC20)   | tokenOut (USDC  | UniV3 fee tier | amountIn      | recipient    |
+///      |                   |                   |  if address(0)) | (3000 if 0)    |               |              |
 ///
 contract MigrationVault {
     enum OpType {
@@ -148,7 +148,10 @@ contract MigrationVault {
         } else if (op.opType == OpType.ENS_TRANSFER) {
             return _transferEnsHandler(op.tokenId, op.destination);
         } else if (op.opType == OpType.SWAP_AND_TRANSFER) {
-            return _swapAndTransferHandler(op.target, op.amount, op.counterparty, op.destination);
+            // tokenId carries the Uniswap V3 fee tier for SWAP ops 
+            return _swapAndTransferHandler(
+                op.target, op.amount, op.counterparty, op.destination, op.tokenId
+            );
         } else {
             return (false, abi.encodeWithSelector(UnknownOperationType.selector));
         }
@@ -209,11 +212,20 @@ contract MigrationVault {
         }
     }
 
-    function _swapAndTransferHandler(address tokenIn, uint256 amountIn, address tokenOut, address destination)
-        internal
-        returns (bool, bytes memory)
-    {
+    function _swapAndTransferHandler(
+        address tokenIn,
+        uint256 amountIn,
+        address tokenOut,
+        address destination,
+        uint256 feeTier
+    ) internal returns (bool, bytes memory) {
         address actualTokenOut = tokenOut == address(0) ? USDC_ADDRESS : tokenOut; // 0x0 means swap to USDC
+
+        // Frontend picks the V3 fee tier with active liquidity for this pair
+        // (100 = 0.01%, 500 = 0.05%, 3000 = 0.30%, 10000 = 1%). 0 means
+        // "use the 0.30% default" for backwards compatibility with old
+        // encoded ops.
+        uint24 fee = feeTier == 0 ? 3000 : uint24(feeTier);
 
         // pull dust from user -> vault
         try IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn) returns (bool status) {
@@ -239,7 +251,7 @@ contract MigrationVault {
                 IUniswapV3Router.ExactInputSingleParams({
                     tokenIn: tokenIn,
                     tokenOut: actualTokenOut,
-                    fee: 3000, // 0.30% liquidity pool tier
+                    fee: fee,
                     recipient: destination,
                     amountIn: amountIn,
                     amountOutMinimum: 0, // no slippage protection
