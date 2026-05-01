@@ -8,21 +8,30 @@ export interface Step {
   icon?: string;
 }
 
-export function StepIndicator({
-  steps,
-  current,
-}: {
+interface Props {
   steps: Step[];
   current: number;
-}) {
+  /** Click handler — receives the index of the step the user wants to jump to. */
+  onSelect?: (index: number) => void;
+  /** Optional gate. Returning false from canSelect disables the click. */
+  canSelect?: (index: number) => boolean;
+}
+
+export function StepIndicator({ steps, current, onSelect, canSelect }: Props) {
   return (
     <ol className="flex items-center gap-1 sm:gap-3 w-full overflow-x-auto pb-1">
       {steps.map((s, i) => {
         const state =
           i < current ? "done" : i === current ? "active" : "pending";
+        const clickable =
+          !!onSelect && i !== current && (canSelect?.(i) ?? i <= current);
+        const Tag = clickable ? "button" : "div";
         return (
           <li key={s.id} className="flex items-center gap-1 sm:gap-3 shrink-0">
-            <div
+            <Tag
+              type={clickable ? "button" : undefined}
+              onClick={clickable ? () => onSelect?.(i) : undefined}
+              aria-label={clickable ? `Go to ${s.label}` : undefined}
               className={cn(
                 "flex items-center gap-2 px-3 py-1.5 rounded-full border-2 text-xs sm:text-sm font-semibold transition-all",
                 state === "done" &&
@@ -30,7 +39,9 @@ export function StepIndicator({
                 state === "active" &&
                   "bg-peach-100 border-ink-900 text-ink-900 shadow-pop-sm",
                 state === "pending" &&
-                  "bg-white/60 border-ink-300 text-ink-500"
+                  "bg-white/60 border-ink-300 text-ink-500",
+                clickable && "hover:scale-[1.03] cursor-pointer",
+                !clickable && state === "pending" && "cursor-not-allowed"
               )}
             >
               <span
@@ -45,7 +56,7 @@ export function StepIndicator({
               </span>
               <span className="hidden sm:inline">{s.label}</span>
               <span className="sm:hidden">{s.icon ?? s.label.charAt(0)}</span>
-            </div>
+            </Tag>
             {i < steps.length - 1 && (
               <span
                 className={cn(
