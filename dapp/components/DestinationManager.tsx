@@ -6,6 +6,7 @@ import { isAddress, shortAddr, cn } from "@/lib/utils";
 import { resolveENS } from "@/lib/adapters/ens";
 import { PixelButton } from "./PixelButton";
 
+// <HTML tags written by AI.>
 interface Props {
   defaultDestination: `0x${string}` | "";
   onChangeDefault: (addr: `0x${string}` | "") => void;
