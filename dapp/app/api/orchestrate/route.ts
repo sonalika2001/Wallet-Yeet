@@ -1,29 +1,80 @@
-// POST /api/orchestrate
+// POST /api/orchestrate — Server-Sent Events stream
 //
-// Runs Scout → Auditor → Planner sequentially and returns the full
-// inventory + audit + plan. The frontend renders the three-agent
-// progress bar separately and animates while this endpoint runs.
-//
-// When ANTHROPIC_API_KEY + ALCHEMY_API_KEY aren't set, each agent
-// falls back to mock data so the UI remains usable end-to-end.
+// We stream events so the agents page can show live progress as Scout →
+// Auditor → Planner work, instead of staring at a fake animated timeline.
+// Each event is `data: ${JSON.stringify(event)}\n\n`. The final "complete"
+// event carries the full payload (same shape as the legacy JSON response)
+// so frontend state still gets a single source of truth at the end.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { runScoutAgent } from "@/lib/agents/scout";
 import { runAuditorAgent } from "@/lib/agents/auditor";
 import { runPlannerAgent } from "@/lib/agents/planner";
+import { fetchAgentIdentities } from "@/lib/agents/identity";
 import { hasServerKeys, STRATEGY_PRESETS } from "@/lib/config";
-import type { OrchestrateResponse, UserPreferences } from "@/lib/types";
+import type {
+  AgentEnsIdentity,
+  AgentName,
+  AgentOutputSample,
+  AgentRunMeta,
+  DiscoveryInventory,
+  MigrationPlan,
+  OrchestrateEvent,
+  OrchestrateResponse,
+  UserPreferences,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 interface OrchestrateRequest {
   oldWallet: string;
   preferences: UserPreferences;
 }
 
-function bad(msg: string, status = 400) {
-  return NextResponse.json({ error: msg }, { status });
+const MODEL_LABEL = "gpt-4o-mini@azure";
+
+function summariseScout(inv: DiscoveryInventory): AgentOutputSample {
+  const counts: Record<string, number> = {};
+  for (const a of inv.assets) counts[a.category] = (counts[a.category] ?? 0) + 1;
+  const total = inv.assets.length;
+  const parts = Object.entries(counts).map(
+    ([k, v]) => `${v} ${k}${v === 1 ? "" : "s"}`,
+  );
+  return {
+    summary: `Discovered ${total} on-chain asset${total === 1 ? "" : "s"} for the wallet.`,
+    highlights: [
+      ...parts,
+      ...(inv.unmigratable.length
+        ? [`${inv.unmigratable.length} flagged unmigratable`]
+        : []),
+    ],
+  };
+}
+
+function summariseAuditor(inv: DiscoveryInventory): AgentOutputSample {
+  const dangerous = inv.assets.filter((a) => a.riskLevel === "DANGEROUS").length;
+  const suspicious = inv.assets.filter((a) => a.riskLevel === "SUSPICIOUS").length;
+  const dust = inv.assets.filter((a) => a.isDust).length;
+  return {
+    summary: `Scored risks across ${inv.assets.length} asset${inv.assets.length === 1 ? "" : "s"}.`,
+    highlights: [
+      `${dangerous} DANGEROUS`,
+      `${suspicious} SUSPICIOUS`,
+      `${dust} dust token${dust === 1 ? "" : "s"} eligible for swap`,
+    ],
+  };
+}
+
+function summarisePlanner(plan: MigrationPlan): AgentOutputSample {
+  const opCounts: Record<string, number> = {};
+  for (const op of plan.operations) opCounts[op.opType] = (opCounts[op.opType] ?? 0) + 1;
+  const total = plan.operations.length;
+  const dest = new Set(plan.operations.map((o) => o.destination)).size;
+  return {
+    summary: `Sequenced ${total} op${total === 1 ? "" : "s"} across ${dest} destination${dest === 1 ? "" : "s"}.`,
+    highlights: Object.entries(opCounts).map(([k, v]) => `${v}× ${k}`),
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -31,34 +82,118 @@ export async function POST(req: NextRequest) {
   try {
     body = (await req.json()) as OrchestrateRequest;
   } catch {
-    return bad("Invalid JSON body");
+    return new Response("Invalid JSON body", { status: 400 });
   }
 
   const { oldWallet, preferences } = body ?? {};
   if (!oldWallet || !/^0x[a-fA-F0-9]{40}$/.test(oldWallet)) {
-    return bad("Missing or invalid oldWallet address");
+    return new Response("Missing or invalid oldWallet address", { status: 400 });
   }
   if (!preferences?.defaultDestination) {
-    return bad("Missing preferences.defaultDestination");
+    return new Response("Missing preferences.defaultDestination", { status: 400 });
   }
   if (!(STRATEGY_PRESETS as readonly string[]).includes(preferences.strategy)) {
-    return bad("Invalid preferences.strategy");
+    return new Response("Invalid preferences.strategy", { status: 400 });
   }
 
-  try {
-    const inventory = await runScoutAgent(oldWallet);
-    const auditedInventory = await runAuditorAgent(inventory);
-    const plan = await runPlannerAgent(auditedInventory, preferences);
+  const isMock = !hasServerKeys();
 
-    const payload: OrchestrateResponse = {
-      inventory,
-      auditedInventory,
-      plan,
-      isMock: !hasServerKeys(),
-    };
-    return NextResponse.json(payload);
-  } catch (err) {
-    console.error("[orchestrate] failed:", err);
-    return bad("Agent pipeline failed", 500);
-  }
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const send = (event: OrchestrateEvent) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
+
+      const timings: Partial<Record<AgentName, AgentRunMeta>> = {};
+      const outputs: Partial<Record<AgentName, AgentOutputSample>> = {};
+
+      // Resolve agent ENS identities in parallel with the pipeline. We
+      // emit them as part of agent:start once the lookup lands.
+      const identitiesPromise: Promise<
+        Partial<Record<AgentName, AgentEnsIdentity>>
+      > = fetchAgentIdentities().catch((err) => {
+        console.warn("[orchestrate] agent identity lookup failed:", err);
+        return {};
+      });
+
+      const phaseEmitter = (agent: AgentName) => (message: string) => {
+        send({ type: "agent:phase", agent, message });
+      };
+
+      try {
+        const identities = await identitiesPromise;
+
+        // ── SCOUT ─────────────────────────────────────────────────────
+        send({ type: "agent:start", agent: "scout", identity: identities.scout });
+        const tScout = Date.now();
+        const inventory = await runScoutAgent(oldWallet, phaseEmitter("scout"));
+        const scoutTiming: AgentRunMeta = {
+          durationMs: Date.now() - tScout,
+          model: isMock ? "mock" : MODEL_LABEL,
+          llmOk: !isMock,
+        };
+        const scoutOutput = summariseScout(inventory);
+        timings.scout = scoutTiming;
+        outputs.scout = scoutOutput;
+        send({ type: "agent:done", agent: "scout", timing: scoutTiming, output: scoutOutput });
+
+        // ── AUDITOR ───────────────────────────────────────────────────
+        send({ type: "agent:start", agent: "auditor", identity: identities.auditor });
+        const tAuditor = Date.now();
+        const auditedInventory = await runAuditorAgent(inventory, phaseEmitter("auditor"));
+        const auditorTiming: AgentRunMeta = {
+          durationMs: Date.now() - tAuditor,
+          model: isMock ? "mock" : MODEL_LABEL,
+          llmOk: !isMock,
+        };
+        const auditorOutput = summariseAuditor(auditedInventory);
+        timings.auditor = auditorTiming;
+        outputs.auditor = auditorOutput;
+        send({ type: "agent:done", agent: "auditor", timing: auditorTiming, output: auditorOutput });
+
+        // ── PLANNER ───────────────────────────────────────────────────
+        send({ type: "agent:start", agent: "planner", identity: identities.planner });
+        const tPlanner = Date.now();
+        const plan = await runPlannerAgent(auditedInventory, preferences, phaseEmitter("planner"));
+        const plannerTiming: AgentRunMeta = {
+          durationMs: Date.now() - tPlanner,
+          model: isMock ? "mock" : MODEL_LABEL,
+          llmOk: !isMock,
+        };
+        const plannerOutput = summarisePlanner(plan);
+        timings.planner = plannerTiming;
+        outputs.planner = plannerOutput;
+        send({ type: "agent:done", agent: "planner", timing: plannerTiming, output: plannerOutput });
+
+        const payload: OrchestrateResponse = {
+          inventory,
+          auditedInventory,
+          plan,
+          isMock,
+          agentTimings: timings,
+          agentOutputs: outputs,
+          agentIdentities: identities,
+        };
+        send({ type: "complete", payload });
+        controller.close();
+      } catch (err) {
+        console.error("[orchestrate] failed:", err);
+        send({
+          type: "error",
+          message: err instanceof Error ? err.message : "Pipeline failed",
+        });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
