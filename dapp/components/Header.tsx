@@ -20,9 +20,6 @@ export function Header() {
           <span className="font-display text-2xl font-extrabold tracking-tight">
             Wallet<span className="text-gradient">Yeet</span>
           </span>
-          <span className="hidden sm:inline-block pill pill--lilac ml-2">
-            Sepolia
-          </span>
         </Link>
 
         <nav className="flex items-center gap-2 sm:gap-3">
