@@ -23,15 +23,17 @@ export default function LandingPage() {
               <ChainBadge />
             </div>
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05]">
-              Yeet your wallet.
+              Yeet the mess.
               <br />
-              <span className="text-gradient">Done in one batch.</span>
+              <span className="text-gradient">Keep the value.</span>
             </h1>
             <p className="mt-5 text-lg text-ink-700 max-w-xl">
-              AI agents discover, audit, and plan. You choose what goes
-              where. WalletYeet bundles approvals, transfers, dust swaps,
-              ENS subnames and risky-allowance revocations into a single
-              EIP-7702 migration so you sign once instead of fourteen times.
+              Reorg your entire wallet in <strong>one signature</strong>.
+              Split assets across <strong>up to five destination
+              wallets</strong> — NFTs to your gallery, stablecoins to
+              savings, dust auto-swapped to USDC, risky approvals revoked.
+              EIP-7702 bundles all of it into a single transaction
+              instead of fourteen.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -55,7 +57,6 @@ export default function LandingPage() {
                 Live on Sepolia testnet
               </span>
               <span>Open source · MIT</span>
-              <span>Built solo for ETHGlobal</span>
             </div>
           </div>
 
@@ -64,18 +65,20 @@ export default function LandingPage() {
             <div className="card-pop p-6 bg-gradient-to-br from-peach-50 via-white to-lilac-50">
               <div className="flex items-center justify-between">
                 <div className="font-pixel text-[10px] tracking-[0.2em] text-ink-500">
-                  WALLET-YEET // v0.1
+                  WALLET-YEET // REORG MODE
                 </div>
                 <span className="pill pill--safe">ready</span>
               </div>
 
               <div className="flex flex-col items-center gap-3 py-6">
                 <Mascot size={180} />
-                <div className="font-display text-xl font-bold">
-                  one batched yeet
+                <div className="font-display text-base font-bold text-center leading-tight px-2">
+                  AI scouts the dust.<br />
+                  7702 handles the move.<br />
+                  You just sign once.
                 </div>
-                <div className="text-xs text-ink-500 -mt-1">
-                  multi-asset · multi-destination · one signature
+                <div className="text-xs text-ink-500 -mt-1 text-center px-2">
+                  multi-asset · up to <strong>5 destination wallets</strong> · one signature
                 </div>
               </div>
 
@@ -134,12 +137,15 @@ export default function LandingPage() {
               WITH WALLETYEET
             </div>
             <div className="font-display text-2xl font-bold mt-1">
-              One batched migration.
+              One reorg. Multiple destinations.
             </div>
             <ul className="mt-4 space-y-2 text-sm text-ink-700">
               <li>✅ Scout finds every token, NFT, ENS, and approval</li>
               <li>✅ Auditor flags risky approvals → revoked first</li>
-              <li>✅ Planner routes assets to your chosen wallets</li>
+              <li>
+                ✅ <strong>Per-asset destination routing</strong> — NFTs to
+                one wallet, stables to another, up to 5
+              </li>
               <li>✅ Dust auto-swapped to USDC via Uniswap V3</li>
               <li>✅ EIP-7702 batches everything into one signature</li>
             </ul>
@@ -194,7 +200,7 @@ export default function LandingPage() {
               shadow: "shadow-pop-lilac",
               steps: [
                 "Sequences ops safely",
-                "Honors per-asset destinations",
+                "Routes each asset to its own destination wallet",
                 "Adds dust→USDC swap ops",
               ],
             },
@@ -223,12 +229,8 @@ export default function LandingPage() {
             SPONSOR INTEGRATIONS
           </div>
           <h2 className="font-display text-3xl font-bold mt-2">
-            Modular adapters. Each can fail independently.
+            Built natively into the pipeline.
           </h2>
-          <p className="text-ink-500 mt-2 max-w-2xl mx-auto">
-            Core migration works on its own. Adapters just add features —
-            disable any one with a feature flag and the rest still ship.
-          </p>
         </div>
         <SponsorBadges />
       </section>
@@ -238,10 +240,11 @@ export default function LandingPage() {
         <div className="card-pop p-8 sm:p-10 bg-gradient-to-br from-peach-50 via-white to-lilac-50 text-center">
           <Mascot size={120} className="mx-auto" />
           <h2 className="font-display text-4xl font-bold mt-4">
-            Ready to migrate?
+            Ready to reorg?
           </h2>
           <p className="text-ink-500 mt-2">
-            Connect your old wallet. The agents take it from there.
+            Connect your old wallet. Pick where each asset goes. Sign once.
+            The agents handle the rest.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link href="/migrate">

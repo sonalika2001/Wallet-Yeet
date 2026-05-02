@@ -4,13 +4,13 @@ import { Providers } from "./providers";
 
 //<metadata written by AI.>
 export const metadata: Metadata = {
-  title: "WalletYeet — yeet that wallet",
+  title: "WalletYeet · Yeet the mess. Keep the value.",
   description:
     "AI agents discover, audit, and plan your wallet migration. You choose what goes where. One signature does it all.",
   openGraph: {
     title: "WalletYeet",
     description:
-      "Yeet your wallet — three AI agents discover, audit, and plan; you choose destinations; one signature does it all.",
+      "Three AI agents discover, audit, and plan your wallet migration; you choose destinations; one signature does it all.",
     type: "website",
   },
 };
