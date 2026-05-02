@@ -2,28 +2,22 @@ import { ENABLED_FEATURES } from "@/lib/config";
 
 const ITEMS = [
   {
-    key: "keeperHub",
-    emoji: "🛰️",
-    title: "KeeperHub",
-    blurb: "Reliable execution with retry + MEV protect",
-  },
-  {
     key: "uniswapDust",
     emoji: "🔁",
     title: "Uniswap",
-    blurb: "Auto-swap dust to USDC during migration",
+    blurb: "Planner probes V3 pools at every fee tier; dust swapped to USDC inside the same migration tx.",
   },
   {
     key: "ensSubnames",
     emoji: "🟦",
     title: "ENS",
-    blurb: "Migrate subnames as first-class assets",
+    blurb: "Each agent has a verified subname under walletyeet-demo.eth; user subnames migrate as first-class assets.",
   },
 ] as const;
 
 export function SponsorBadges() {
   return (
-    <div className="grid sm:grid-cols-3 gap-3">
+    <div className="grid sm:grid-cols-2 gap-3">
       {ITEMS.map((it) => {
         const on = ENABLED_FEATURES[it.key as keyof typeof ENABLED_FEATURES];
         return (
