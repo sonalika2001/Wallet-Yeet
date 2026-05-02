@@ -109,7 +109,7 @@ const config: Config = {
         bounceY: "bounceY 2.4s ease-in-out infinite",
         wiggle: "wiggle 1.6s ease-in-out infinite",
         sparkle: "sparkle 2.2s ease-in-out infinite",
-        "yeet-x": "yeet-x 1.4s cubic-bezier(.33,.0,.66,.33) forwards",
+        "yeet-x": "yeet-x 3.2s cubic-bezier(.22,.0,.38,1) forwards",
         "fade-up": "fade-up 0.45s ease-out both",
         shimmer: "shimmer 2.4s linear infinite",
         "pulse-ring": "pulse-ring 1.6s cubic-bezier(0.215,0.61,0.355,1) infinite",
