@@ -148,3 +148,201 @@ export interface BatcherStep {
   label: string;
 }
 
+/**
+ * Convert a MigrationPlan into a flat sequence of low-level Batcher calls.
+ * Most ops map to a single call; SWAP_AND_TRANSFER expands to two
+ * (approve + exactInputSingle).
+ */
+export function planToBatcherSteps(
+  plan: MigrationPlan,
+  user: `0x${string}`,
+): BatcherStep[] {
+  const steps: BatcherStep[] = [];
+
+  for (const op of plan.operations) {
+    switch (op.opType) {
+      case "TRANSFER_NATIVE": {
+        // Native gas-asset transfer: under EIP-7702 the EOA delegates to
+        // Batcher.execute, so `target.call{value: amount}` here debits the
+        // user's own balance. No data, just value.
+        const amountIn = BigInt(op.amount ?? "0");
+        if (amountIn === 0n) continue;
+        steps.push({
+          call: {
+            target: op.destination,
+            value: amountIn,
+            data: "0x" as `0x${string}`,
+            gas: GAS_HINT_NATIVE_TRANSFER,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
+          label: op.explanation || "Transfer Sepolia ETH",
+        });
+        break;
+      }
+
+      case "REVOKE_ERC20": {
+        if (!op.counterparty) continue;
+        steps.push({
+          call: {
+            target: op.target,
+            value: 0n,
+            data: encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [op.counterparty, 0n],
+            }),
+            gas: GAS_HINT_ERC20_APPROVE,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
+          label: op.explanation || "Revoke approval",
+        });
+        break;
+      }
+
+      case "TRANSFER_ERC20": {
+        steps.push({
+          call: {
+            target: op.target,
+            value: 0n,
+            data: encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: "transfer",
+              args: [op.destination, BigInt(op.amount ?? "0")],
+            }),
+            gas: GAS_HINT_ERC20_TRANSFER,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
+          label: op.explanation || "Transfer ERC-20",
+        });
+        break;
+      }
+
+      case "TRANSFER_ERC721": {
+        // Use plain transferFrom (not safe). safeTransferFrom calls
+        // onERC721Received on the destination if it's a contract — under
+        // EIP-7702 the user's EOA temporarily IS a contract (running the
+        // Batcher's code), and some NFT contracts revert in MetaMask's
+        // pre-flight simulation due to that. transferFrom skips the
+        // receiver check entirely and works for both EOA and contract
+        // destinations as long as they can hold the NFT.
+        steps.push({
+          call: {
+            target: op.target,
+            value: 0n,
+            data: encodeFunctionData({
+              abi: ERC721_ABI,
+              functionName: "transferFrom",
+              args: [user, op.destination, BigInt(op.tokenId ?? "0")],
+            }),
+            gas: GAS_HINT_ERC721_TRANSFER,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
+          label: op.explanation || "Transfer NFT",
+        });
+        break;
+      }
+
+      case "TRANSFER_ERC1155": {
+        steps.push({
+          call: {
+            target: op.target,
+            value: 0n,
+            data: encodeFunctionData({
+              abi: ERC1155_ABI,
+              functionName: "safeTransferFrom",
+              args: [
+                user,
+                op.destination,
+                BigInt(op.tokenId ?? "0"),
+                BigInt(op.amount ?? "1"),
+                "0x",
+              ],
+            }),
+            gas: GAS_HINT_ERC1155_TRANSFER,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
+          label: op.explanation || "Transfer ERC-1155",
+        });
+        break;
+      }
+
+      case "ENS_TRANSFER": {
+        if (!op.tokenId) continue;
+        const node = (`0x${BigInt(op.tokenId).toString(16).padStart(64, "0")}`) as `0x${string}`;
+        steps.push({
+          call: {
+            target: SEPOLIA_ENS_REGISTRY,
+            value: 0n,
+            data: encodeFunctionData({
+              abi: ENS_REGISTRY_ABI,
+              functionName: "setOwner",
+              args: [node, op.destination],
+            }),
+            gas: GAS_HINT_ENS_REGISTRY,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
+          label: op.explanation || "Transfer ENS subname",
+        });
+        break;
+      }
+
+      case "SWAP_AND_TRANSFER": {
+        const amountIn = BigInt(op.amount ?? "0");
+        if (amountIn === 0n) continue;
+        const tokenIn = op.target;
+        const tokenOut =
+          op.counterparty && op.counterparty !== "0x0000000000000000000000000000000000000000"
+            ? op.counterparty
+            : SEPOLIA_SWAP_USDC;
+        // Planner stashes the chosen V3 fee tier in tokenId for SWAP ops.
+        const fee = op.tokenId ? Number(op.tokenId) : DEFAULT_UNISWAP_FEE_TIER;
+
+        // Sub-call 1: approve the router to pull tokenIn from the EOA.
+        steps.push({
+          call: {
+            target: tokenIn,
+            value: 0n,
+            data: encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [SEPOLIA_UNISWAP_V3_ROUTER, amountIn],
+            }),
+            gas: GAS_HINT_ERC20_APPROVE,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
+          label: `Approve Uniswap V3 router for ${op.assetId}`,
+        });
+
+        // Sub-call 2: the swap itself, sending tokenOut directly to destination.
+        steps.push({
+          call: {
+            target: SEPOLIA_UNISWAP_V3_ROUTER,
+            value: 0n,
+            data: encodeFunctionData({
+              abi: UNISWAP_V3_ROUTER_ABI,
+              functionName: "exactInputSingle",
+              args: [
+                {
+                  tokenIn,
+                  tokenOut,
+                  fee,
+                  recipient: op.destination,
+                  amountIn,
+                  amountOutMinimum: 0n,
+                  sqrtPriceLimitX96: 0n,
+                },
+              ],
+            }),
+            gas: GAS_HINT_UNISWAP_SWAP,
+          },
+          origin: { assetId: op.assetId, opType: op.opType, subIndex: 1 },
+          label: op.explanation || "Swap dust → USDC",
+        });
+        break;
+      }
+    }
+  }
+
+  return steps;
+}
+
