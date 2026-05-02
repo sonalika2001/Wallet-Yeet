@@ -31,9 +31,8 @@ export default function LandingPage() {
               Reorg your entire wallet in <strong>one signature</strong>.
               Split assets across <strong>up to five destination
               wallets</strong> — NFTs to your gallery, stablecoins to
-              savings, dust auto-swapped to USDC, risky approvals revoked.
-              EIP-7702 bundles all of it into a single transaction
-              instead of fourteen.
+              savings, dust auto-swapped to USDC. EIP-7702 bundles all
+              of it into a single transaction instead of fourteen.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -124,11 +123,11 @@ export default function LandingPage() {
               Migrating wallets sucks.
             </div>
             <ul className="mt-4 space-y-2 text-sm text-ink-700">
-              <li>❌ Forget to revoke risky approvals</li>
               <li>❌ Miss ENS subnames entirely</li>
               <li>❌ Leave dust tokens behind forever</li>
               <li>❌ Send everything to one wallet by mistake</li>
-              <li>❌ Manually sign 30 transactions, hoping nothing breaks</li>
+              <li>❌ Manually sign dozens of transactions, hoping nothing breaks</li>
+              <li>❌ Pay 14× the base gas you needed to</li>
             </ul>
           </div>
 
@@ -140,8 +139,8 @@ export default function LandingPage() {
               One reorg. Multiple destinations.
             </div>
             <ul className="mt-4 space-y-2 text-sm text-ink-700">
-              <li>✅ Scout finds every token, NFT, ENS, and approval</li>
-              <li>✅ Auditor flags risky approvals → revoked first</li>
+              <li>✅ Scout finds every token, NFT, and ENS subname</li>
+              <li>✅ Auditor flags dust + spam tokens, scores risk</li>
               <li>
                 ✅ <strong>Per-asset destination routing</strong> — NFTs to
                 one wallet, stables to another, up to 5
@@ -188,9 +187,9 @@ export default function LandingPage() {
               tint: "from-peach-100 to-peach-50",
               shadow: "shadow-pop-peach",
               steps: [
-                "Reviews every approval",
-                "Flags SAFE / SUSPICIOUS / DANGEROUS",
-                "Identifies sub-$1 dust",
+                "Scores each asset SAFE / SUSPICIOUS / DANGEROUS",
+                "Identifies sub-$1 dust eligible for swap",
+                "Flags unmigratable items (POAPs, soulbound)",
               ],
             },
             {

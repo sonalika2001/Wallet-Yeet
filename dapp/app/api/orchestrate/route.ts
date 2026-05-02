@@ -34,12 +34,29 @@ interface OrchestrateRequest {
 
 const MODEL_LABEL = "gpt-4o-mini@azure";
 
+// Human-readable labels per asset category. Avoids degenerate plurals like
+// "2 enss" or "2 dust-tokens" that the naive `${k}s` template produces.
+const CATEGORY_LABEL: Record<string, { singular: string; plural: string }> = {
+  token: { singular: "token", plural: "tokens" },
+  "dust-token": { singular: "dust token", plural: "dust tokens" },
+  nft: { singular: "NFT", plural: "NFTs" },
+  ens: { singular: "ENS name", plural: "ENS names" },
+  native: { singular: "native asset", plural: "native assets" },
+};
+
+function labelForCategory(cat: string, count: number): string {
+  const entry = CATEGORY_LABEL[cat];
+  if (entry) return count === 1 ? entry.singular : entry.plural;
+  // Unknown category: fall back to the raw key but keep a sane plural rule.
+  return count === 1 ? cat : `${cat}s`;
+}
+
 function summariseScout(inv: DiscoveryInventory): AgentOutputSample {
   const counts: Record<string, number> = {};
   for (const a of inv.assets) counts[a.category] = (counts[a.category] ?? 0) + 1;
   const total = inv.assets.length;
   const parts = Object.entries(counts).map(
-    ([k, v]) => `${v} ${k}${v === 1 ? "" : "s"}`,
+    ([k, v]) => `${v} ${labelForCategory(k, v)}`,
   );
   return {
     summary: `Discovered ${total} on-chain asset${total === 1 ? "" : "s"} for the wallet.`,
@@ -53,15 +70,12 @@ function summariseScout(inv: DiscoveryInventory): AgentOutputSample {
 }
 
 function summariseAuditor(inv: DiscoveryInventory): AgentOutputSample {
-  const dangerous = inv.assets.filter((a) => a.riskLevel === "DANGEROUS").length;
-  const suspicious = inv.assets.filter((a) => a.riskLevel === "SUSPICIOUS").length;
   const dust = inv.assets.filter((a) => a.isDust).length;
   return {
     summary: `Scored risks across ${inv.assets.length} asset${inv.assets.length === 1 ? "" : "s"}.`,
     highlights: [
-      `${dangerous} DANGEROUS`,
-      `${suspicious} SUSPICIOUS`,
       `${dust} dust token${dust === 1 ? "" : "s"} eligible for swap`,
+      "All other assets: SAFE",
     ],
   };
 }
