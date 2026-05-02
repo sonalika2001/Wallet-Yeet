@@ -48,6 +48,11 @@ export function Mascot({
         className="pixelated"
         shapeRendering="crispEdges"
       >
+        {/* fedora sits above the helmet — small MJ tribute. 6-wide crown
+            at y=0 with a 10-wide brim at y=1, both flush against the
+            top of the helmet outline at y=2. */}
+        <rect x="3" y="1" width="10" height="1" fill="#1A1733" />
+        <rect x="5" y="0" width="6" height="1" fill="#1A1733" />
         {/* helmet outline */}
         <rect x="4" y="2" width="8" height="1" fill="#1A1733" />
         <rect x="3" y="3" width="1" height="6" fill="#1A1733" />
@@ -75,7 +80,12 @@ export function Mascot({
         <rect x="2" y="11" width="2" height="1" fill="#1A1733" />
         <rect x="2" y="12" width="2" height="1" fill="#FFFFFF" />
         <rect x="12" y="9" width="2" height="1" fill="#1A1733" />
+        {/* the raised hand — sparkly white MJ glove. The white forearm
+            extends one extra pixel out so the silhouette reads "glove",
+            and a warm-gold pixel above the cuff sells the sparkle. */}
         <rect x="12" y="10" width="2" height="1" fill="#FFFFFF" />
+        <rect x="14" y="9" width="1" height="1" fill="#FFFFFF" />
+        <rect x="14" y="8" width="1" height="1" fill="#FFE7C2" />
         {/* feet */}
         <rect x="5" y="15" width="2" height="1" fill="#1A1733" />
         <rect x="9" y="15" width="2" height="1" fill="#1A1733" />
