@@ -6,6 +6,13 @@ const nextConfig = {
       { protocol: "https", hostname: "**" },
     ],
   },
+  // Keep compiled pages alive longer in dev so navigating between steps
+  // doesn't trigger a fresh compile + chunk-load timeout. Default is 25s
+  // for inactive pages and 2 active. Bumped because our compile is heavy.
+  onDemandEntries: {
+    maxInactiveAge: 5 * 60 * 1000, // 5 minutes — keep pages warm
+    pagesBufferLength: 10, // keep up to 10 routes in memory
+  },
   // Hoist heavy wallet libs out of the per-page bundle so they compile once,
   // not on every page-route hit. Major dev-compile speed-up for this app.
   experimental: {
@@ -37,6 +44,12 @@ const nextConfig = {
     // faster recompiles, which matters when our cold-compile is ~3 min.
     if (dev) {
       config.devtool = "eval-cheap-module-source-map";
+      // Bump chunk-load timeout from 120s default to 300s. Our wagmi/
+      // RainbowKit/MetaMask-SDK graph can take ~2-3 min to compile a fresh
+      // chunk on Windows; the default times out and the browser shows a
+      // ChunkLoadError that the user reads as "the app crashed".
+      config.output = config.output || {};
+      config.output.chunkLoadTimeout = 300_000;
     }
     return config;
   },

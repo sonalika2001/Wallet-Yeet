@@ -1,14 +1,16 @@
 {
   "name": "walletyeet-frontend",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_OPTIONS= DEBUG= next dev",
+    "dev:fresh": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && cross-env NODE_OPTIONS= DEBUG= next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
+  "//": "Turbopack is incompatible with @metamask/sdk's webpackIgnore magic comments — don't add a dev:turbo script. Use plain `pnpm dev` (webpack) or `pnpm dev:fresh` to clear the cache first.",
   "dependencies": {
     "@ensdomains/ensjs": "^4.0.2",
     "@rainbow-me/rainbowkit": "^2.2.10",
