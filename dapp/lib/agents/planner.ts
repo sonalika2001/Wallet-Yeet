@@ -378,7 +378,7 @@ export async function runPlannerAgent(
 
   let llmExplanations: PlannerLlmResponse | null = null;
   try {
-    onPhase?.("Calling GPT-4o-mini to write explanations + plan summary…");
+    onPhase?.("Asking GPT-4o-mini to write explanations + plan summary…");
     const response = await withRetry(
       () => oai.chat.completions.create({
       model: process.env.AZURE_OPENAI_DEPLOYMENT!,

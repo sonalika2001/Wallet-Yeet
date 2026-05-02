@@ -16,7 +16,8 @@ import { MOCK_INVENTORY } from "../mockData";
 import { fetchENSSubnames } from "../adapters/ens";
 import { discoverApprovals } from "../adapters/approvals";
 import { KNOWN_TOKENS, KNOWN_NFT_COLLECTIONS } from "../contracts";
-import { formatUnits } from "viem";
+import { createPublicClient, formatUnits, http } from "viem";
+import { sepolia } from "viem/chains";
 import { AzureOpenAI } from "openai";
 import { withRetry } from "./retry";
 
@@ -691,7 +692,7 @@ export async function runScoutAgent(
   // flaky model. The LLM cannot affect which assets get migrated.
   let enriched = baselineAssets;
   try {
-    onPhase?.("Calling GPT-4o-mini for displayName + category enrichment…");
+    onPhase?.("Asking GPT-4o-mini to enrich display names + categories…");
     enriched = await enrichWithLLM(baselineAssets);
     onPhase?.("LLM enrichment merged");
   } catch (err) {

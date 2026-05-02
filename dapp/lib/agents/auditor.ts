@@ -79,7 +79,7 @@ export async function runAuditorAgent(
   // could corrupt — and merge the result back. If the call fails or returns
   // malformed JSON we keep the deterministic annotations above.
   try {
-    onPhase?.("Calling GPT-4o-mini for user-friendly risk reasons…");
+    onPhase?.("Asking GPT-4o-mini to write user-friendly risk reasons…");
     const oai = new AzureOpenAI({
       apiKey: process.env.AZURE_OPENAI_API_KEY!,
       endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
