@@ -10,7 +10,6 @@ const flag = (name: string, fallback: boolean): boolean => {
 };
 
 export const ENABLED_FEATURES = {
-  keeperHub: flag("NEXT_PUBLIC_FEATURE_KEEPERHUB", true),
   uniswapDust: flag("NEXT_PUBLIC_FEATURE_UNISWAP", true),
   ensSubnames: flag("NEXT_PUBLIC_FEATURE_ENS", true),
 };

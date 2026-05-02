@@ -106,17 +106,15 @@ async function findSwapPool(
   }
 }
 
-// Canonical execution order — revocations first, ENS last.
-// Matches MigrationVault's pre-condition that approvals get killed before
-// transfers attempt to use them.
+// Canonical execution order — native ETH first (the gas-safe asset),
+// fungibles + swaps next, NFTs after, ENS last.
 const OP_ORDER: Record<OpType, number> = {
-  REVOKE_ERC20: 0,
-  TRANSFER_NATIVE: 1, // native ETH first — last op tx in 7702 batch could revert and we want gas safe
-  TRANSFER_ERC20: 2,
-  SWAP_AND_TRANSFER: 3,
-  TRANSFER_ERC721: 4,
-  TRANSFER_ERC1155: 5,
-  ENS_TRANSFER: 6,
+  TRANSFER_NATIVE: 0,
+  TRANSFER_ERC20: 1,
+  SWAP_AND_TRANSFER: 2,
+  TRANSFER_ERC721: 3,
+  TRANSFER_ERC1155: 4,
+  ENS_TRANSFER: 5,
 };
 
 function sortOps(ops: PlannedOperation[]): PlannedOperation[] {
@@ -147,23 +145,6 @@ async function buildOperations(
   for (const a of inventory.assets) {
     if (a.migrateRecommended === false) {
       skipped.push(`${a.displayName} — flagged unmigratable`);
-      continue;
-    }
-
-    if (a.category === "approval") {
-      // Only revoke when risky — SAFE approvals are left alone.
-      if (a.riskLevel === "SUSPICIOUS" || a.riskLevel === "DANGEROUS") {
-        if (a.contractAddress && a.approvalSpender) {
-          ops.push({
-            assetId: a.id,
-            opType: "REVOKE_ERC20",
-            target: a.contractAddress,
-            counterparty: a.approvalSpender,
-            destination: prefs.defaultDestination, // unused, but contract expects it
-            explanation: "", // filled by the LLM (or fallback) below
-          });
-        }
-      }
       continue;
     }
 
@@ -294,8 +275,6 @@ function fallbackExplanation(op: PlannedOperation, asset: Asset | undefined): st
   const dest = `${op.destination.slice(0, 6)}…${op.destination.slice(-4)}`;
   const name = asset?.displayName ?? asset?.symbol ?? "asset";
   switch (op.opType) {
-    case "REVOKE_ERC20":
-      return `Revoke ${name} approval to ${asset?.approvalSpenderLabel ?? "spender"}`;
     case "TRANSFER_ERC20":
       return `Transfer ${asset?.amountFormatted ?? ""} ${asset?.symbol ?? name} → ${dest}`;
     case "SWAP_AND_TRANSFER":
@@ -318,7 +297,7 @@ function fallbackExplanation(op: PlannedOperation, asset: Asset | undefined): st
 
 function fallbackSummary(ops: PlannedOperation[]): string {
   const dests = new Set(ops.map((o) => o.destination)).size;
-  return `Plan ready. ${ops.length} operation${ops.length === 1 ? "" : "s"} across ${dests} destination${dests === 1 ? "" : "s"}. Revocations run before transfers.`;
+  return `Plan ready. ${ops.length} operation${ops.length === 1 ? "" : "s"} across ${dests} destination${dests === 1 ? "" : "s"}.`;
 }
 
 // ── agent entry point ────────────────────────────────────────────────────
@@ -338,7 +317,7 @@ export async function runPlannerAgent(
 
   // 1) Build the operation list deterministically — never let the LLM own
   //    structural fields (target, amount, tokenId, destination, opType).
-  onPhase?.("Building deterministic op list (revoke → ERC-20 → swap → NFT → ENS)…");
+  onPhase?.("Building deterministic op list (native → ERC-20 → swap → NFT → ENS)…");
   onPhase?.("Verifying Uniswap V3 pool existence for any dust swaps…");
   const { ops, skipped, downgraded } = await buildOperations(inventory, prefs);
   const assetsById = new Map(inventory.assets.map((a) => [a.id, a]));
@@ -371,7 +350,6 @@ export async function runPlannerAgent(
       amountFormatted: a?.amountFormatted,
       tokenId: op.tokenId,
       ensName: a?.ensName,
-      spenderLabel: a?.approvalSpenderLabel,
       destinationShort: `${op.destination.slice(0, 6)}…${op.destination.slice(-4)}`,
     };
   });
@@ -395,7 +373,6 @@ STRICT RULES (violating these means your output is discarded):
 2. Each "explanation" MUST be a single sentence, <= 90 chars, plain prose, no markdown.
 3. The "summary" MUST report the EXACT number of operations and destinations you were given. Do not estimate.
 4. Use these phrasings as templates:
-   - REVOKE_ERC20: "Revoke <assetName> approval to <spenderLabel>."
    - TRANSFER_ERC20: "Transfer <amountFormatted> <symbol> to <destinationShort>."
    - SWAP_AND_TRANSFER: "Swap <assetName> to USDC and send to <destinationShort>."
    - TRANSFER_ERC721 / TRANSFER_ERC1155: "Transfer <assetName> #<tokenId> to <destinationShort>."

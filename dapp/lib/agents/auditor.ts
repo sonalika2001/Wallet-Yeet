@@ -1,7 +1,9 @@
-// ⚠️ Auditor Agent — Risk Specialist
+// ⚠️ Auditor Agent — Risk + Dust Specialist
 //
-// Responsibility: Receives Scout's raw inventory, scores risk per asset
-// (SAFE / SUSPICIOUS / DANGEROUS), and identifies sub-$1 dust tokens.
+// Receives Scout's raw inventory, scores risk per asset
+// (SAFE / SUSPICIOUS / DANGEROUS), and identifies sub-$1 dust tokens
+// eligible for the Uniswap auto-swap path.
+//
 // Uses deterministic heuristics first, then optionally asks GPT-4o-mini
 // (via Microsoft Foundry) to refine the per-item explanation text.
 //
@@ -12,7 +14,6 @@
 import type { DiscoveryInventory } from "../types";
 import { DUST_THRESHOLD_USD, hasServerKeys } from "../config";
 import { MOCK_AUDITED_INVENTORY } from "../mockData";
-import { SUSPICIOUS_ADDRESSES } from "../contracts";
 import { AzureOpenAI } from "openai";
 import { withRetry } from "./retry";
 
@@ -35,20 +36,8 @@ export async function runAuditorAgent(
 
   onPhase?.(`Scoring ${inventory.assets.length} asset${inventory.assets.length === 1 ? "" : "s"} via deterministic rules…`);
   // First-pass deterministic scoring — keeps LLM calls cheap and results
-  // predictable. The LLM refines reasons but never overrides DANGEROUS.
+  // predictable. Auditor's main jobs: classify dust + reassure on safe assets.
   const annotated = inventory.assets.map((a) => {
-    if (a.category === "approval" && a.approvalSpender) {
-      const isKnownBad =
-        SUSPICIOUS_ADDRESSES[a.approvalSpender.toLowerCase()] !== undefined ||
-        SUSPICIOUS_ADDRESSES[a.approvalSpender] !== undefined;
-      return {
-        ...a,
-        riskLevel: isKnownBad ? ("DANGEROUS" as const) : ("SUSPICIOUS" as const),
-        riskReason: isKnownBad
-          ? "Approval target matches a known-bad pattern."
-          : "Unlimited allowance to an unfamiliar contract.",
-      };
-    }
     if (
       (a.category === "token" || a.category === "dust-token") &&
       typeof a.estimatedValueUsd === "number" &&
@@ -70,9 +59,8 @@ export async function runAuditorAgent(
     return { ...a, riskLevel: "SAFE" as const };
   });
 
-  const dangerousCount = annotated.filter((a) => a.riskLevel === "DANGEROUS").length;
-  const suspiciousCount = annotated.filter((a) => a.riskLevel === "SUSPICIOUS").length;
-  onPhase?.(`Flagged ${dangerousCount} DANGEROUS, ${suspiciousCount} SUSPICIOUS`);
+  const dustCount = annotated.filter((a) => a.isDust).length;
+  onPhase?.(`Flagged ${dustCount} dust token${dustCount === 1 ? "" : "s"} eligible for swap`);
 
   // Optional LLM refinement of riskReason text. We send only the fields the
   // model needs to write a better explanation — never structural fields it
@@ -94,7 +82,6 @@ export async function runAuditorAgent(
       symbol: a.symbol,
       displayName: a.displayName,
       riskLevel: a.riskLevel,
-      spenderLabel: a.approvalSpenderLabel,
       isDust: a.isDust ?? false,
     }));
 
@@ -113,10 +100,8 @@ RULES (strict — violations cause your output to be discarded):
 1. NEVER change riskLevel. Output exactly the riskLevel you were given.
 2. Output one entry per input asset, keyed by the input "id".
 3. Each riskReason MUST be a single sentence, <= 120 chars, no markdown, no emojis.
-4. For DANGEROUS approvals: explain in plain English why this approval is dangerous (e.g. unlimited allowance to an address known for draining wallets).
-5. For SUSPICIOUS approvals: note that the spender is unfamiliar and the user should consider revoking.
-6. For dust tokens (isDust=true): mention they're sub-$1 and recommend converting to USDC.
-7. For other SAFE assets: a brief reassurance like "Looks healthy."
+4. For dust tokens (isDust=true): mention they're sub-$1 and recommend converting to USDC.
+5. For other SAFE assets: a brief reassurance like "Looks healthy."
 
 Output strict JSON in this exact schema:
 { "annotations": [ { "id": string, "riskReason": string } ] }`,

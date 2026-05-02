@@ -35,10 +35,7 @@ export const SEPOLIA_ENS_REGISTRY =
 // required to add new test tokens. Just faucet whatever you want to the
 // demo wallet and the pipeline picks it up.
 //
-// The Auditor reads SHIB_PEPE / GOV from here for symbol-based heuristics,
-// and approval discovery in `lib/adapters/approvals.ts` walks this mapping
-// against SUSPICIOUS_ADDRESSES — so anything in here also gets scanned for
-// risky allowances by default.
+// The Auditor reads SHIB_PEPE / GOV from here for symbol-based heuristics.
 export const KNOWN_TOKENS = {
   USDC:      "0xdCa7e8AAA08C8A795364444aA10061dA77Fa1F2a" as `0x${string}`, // seeded mock
   // Circle's official Sepolia USDC — what users get if they send themselves
@@ -72,11 +69,3 @@ export const KNOWN_NFT_COLLECTIONS = {
   MockArt:   "0x98B679b9EC4638A5008587053eA209F5205901b2" as `0x${string}`,
 };
 
-// Pre-set in the seed script — Auditor flags approvals to these as DANGEROUS.
-// All-lowercase to match what the chain stores; viem rejects mixed-case
-// without a valid EIP-55 checksum.
-export const SUSPICIOUS_ADDRESSES: Record<string, string> = {
-  "0x1234567890123456789012345678901234567890": "Suspicious Router",
-  "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef": "Sketchy Marketplace",
-  "0xbaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "Random Drainer",
-};

@@ -14,7 +14,6 @@ import type { Asset, AssetCategory, DiscoveryInventory } from "../types";
 import { hasServerKeys } from "../config";
 import { MOCK_INVENTORY } from "../mockData";
 import { fetchENSSubnames } from "../adapters/ens";
-import { discoverApprovals } from "../adapters/approvals";
 import { KNOWN_TOKENS, KNOWN_NFT_COLLECTIONS } from "../contracts";
 import { createPublicClient, formatUnits, http } from "viem";
 import { sepolia } from "viem/chains";
@@ -495,7 +494,7 @@ function mergeEnsAssets(a: Asset[], b: Asset[]): Asset[] {
 interface ScoutEnrichment {
   id: string;
   displayName?: string;
-  tokenCategory?: "stablecoin" | "governance" | "memecoin" | "utility" | "spam" | "nft" | "ens" | "approval";
+  tokenCategory?: "stablecoin" | "governance" | "memecoin" | "utility" | "spam" | "nft" | "ens";
 }
 
 interface ScoutLLMResponse {
@@ -532,7 +531,7 @@ async function enrichWithLLM(assets: Asset[]): Promise<Asset[]> {
 STRICT RULES:
 1. Output one entry per input asset, keyed by its "id".
 2. "displayName" should be a short human-readable string; if the existing name is already fine, return it unchanged.
-3. "tokenCategory" must be exactly one of: stablecoin, governance, memecoin, utility, nft, ens, approval.
+3. "tokenCategory" must be exactly one of: stablecoin, governance, memecoin, utility, nft, ens.
 4. Do NOT invent fields. Do NOT add a migrateRecommended field. Do NOT add an unmigratable list. Do NOT drop any asset.
 5. Treat MOCK tokens (names starting with "Mock", "DUST-", "SHIB-PEPE", "GOV") as legitimate tokens for testing — never tag them as spam.
 6. Output strict JSON in this schema: { "enrichments": [ { "id": string, "displayName"?: string, "tokenCategory"?: string } ] }`,
@@ -598,17 +597,10 @@ export async function runScoutAgent(
     return r;
   });
 
-  onPhase?.("Scanning known (token, spender) pairs for risky approvals…");
-  const approvalsP = discoverApprovals(wallet as `0x${string}`).then((r) => {
-    onPhase?.(`Detected ${r.length} active approval${r.length === 1 ? "" : "s"}`);
-    return r;
-  });
-
-  const [native, tokensRaw, nftsResult, approvalAssets] = await Promise.all([
+  const [native, tokensRaw, nftsResult] = await Promise.all([
     nativeP,
     tokensP,
     nftsP,
-    approvalsP,
   ]);
   const { wei: nativeWei, gasPrice } = native;
 
@@ -682,7 +674,6 @@ export async function runScoutAgent(
     ...tokenAssets,
     ...buildNftAssets(nftsResult.regular),
     ...ensAssets,
-    ...approvalAssets,
   ];
 
   onPhase?.(`Built deterministic Asset[] (${baselineAssets.length} entries)`);

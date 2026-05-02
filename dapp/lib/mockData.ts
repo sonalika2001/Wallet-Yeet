@@ -162,70 +162,12 @@ export const MOCK_INVENTORY: DiscoveryInventory = {
         "0x" + "cd".repeat(32),
       migrateRecommended: true,
     },
-    {
-      id: "appr-usdc-router",
-      category: "approval",
-      displayName: "USDC → Suspicious Router",
-      symbol: "USDC",
-      contractAddress: tokenAddr(0xa1c1),
-      approvalSpender: "0x1234567890123456789012345678901234567890",
-      approvalSpenderLabel: "Suspicious Router",
-      migrateRecommended: true,
-    },
-    {
-      id: "appr-shib-router",
-      category: "approval",
-      displayName: "SHIB-PEPE → Suspicious Router",
-      symbol: "SHIB-PEPE",
-      contractAddress: tokenAddr(0xa2),
-      approvalSpender: "0x1234567890123456789012345678901234567890",
-      approvalSpenderLabel: "Suspicious Router",
-      migrateRecommended: true,
-    },
-    {
-      id: "appr-gov-drainer",
-      category: "approval",
-      displayName: "GOV → Random Drainer",
-      symbol: "GOV",
-      contractAddress: tokenAddr(0xa3),
-      approvalSpender: "0xBaaaaaaaaaaAAaAAaAAaAAAaaaAAAAAaAaaAAaaa",
-      approvalSpenderLabel: "Random Drainer",
-      migrateRecommended: true,
-    },
-    {
-      id: "appr-punks-mp",
-      category: "approval",
-      displayName: "Punks (ALL) → Sketchy Marketplace",
-      contractAddress: tokenAddr(0xb1),
-      approvalSpender: "0xdeAdBeEfdeAdBEEFdeAdbeefDeAdbEEFdeadBEEF",
-      approvalSpenderLabel: "Sketchy Marketplace",
-      migrateRecommended: true,
-    },
-    {
-      id: "appr-art-mp",
-      category: "approval",
-      displayName: "Art (ALL) → Sketchy Marketplace",
-      contractAddress: tokenAddr(0xb2),
-      approvalSpender: "0xdeAdBeEfdeAdBEEFdeAdbeefDeAdbEEFdeadBEEF",
-      approvalSpenderLabel: "Sketchy Marketplace",
-      migrateRecommended: true,
-    },
   ],
 };
 
 export const MOCK_AUDITED_INVENTORY: DiscoveryInventory = {
   ...MOCK_INVENTORY,
   assets: MOCK_INVENTORY.assets.map((a) => {
-    if (a.category === "approval") {
-      const isDrainer = (a.approvalSpenderLabel ?? "").includes("Drainer");
-      return {
-        ...a,
-        riskLevel: isDrainer ? "DANGEROUS" : "SUSPICIOUS",
-        riskReason: isDrainer
-          ? "Unlimited allowance to a known-bad drainer pattern."
-          : "Unlimited allowance to an unfamiliar contract.",
-      };
-    }
     if (a.isDust) {
       return {
         ...a,
@@ -242,21 +184,7 @@ export function buildMockPlan(prefs: UserPreferences): MigrationPlan {
   const destFor = (id: string) => customRoutes[id] ?? defaultDestination;
   const ops: PlannedOperation[] = [];
 
-  // 1. Revoke risky approvals first.
-  for (const a of MOCK_AUDITED_INVENTORY.assets) {
-    if (a.category !== "approval") continue;
-    if (a.riskLevel === "SAFE") continue;
-    ops.push({
-      assetId: a.id,
-      opType: "REVOKE_ERC20",
-      target: a.contractAddress ?? ZERO,
-      counterparty: a.approvalSpender,
-      destination: defaultDestination,
-      explanation: `Revoke ${a.displayName}`,
-    });
-  }
-
-  // 2. Token transfers (dust may be swapped if convertDust is on).
+  // 1. Token transfers (dust may be swapped if convertDust is on).
   for (const a of MOCK_AUDITED_INVENTORY.assets) {
     if (a.category === "token" || a.category === "dust-token") {
       const useSwap = convertDust && a.isDust;
@@ -273,7 +201,7 @@ export function buildMockPlan(prefs: UserPreferences): MigrationPlan {
     }
   }
 
-  // 3. NFT transfers.
+  // 2. NFT transfers.
   for (const a of MOCK_AUDITED_INVENTORY.assets) {
     if (a.category === "nft") {
       ops.push({
@@ -287,7 +215,7 @@ export function buildMockPlan(prefs: UserPreferences): MigrationPlan {
     }
   }
 
-  // 4. ENS subname transfers (last — not gas-critical).
+  // 3. ENS subname transfers (last — not gas-critical).
   for (const a of MOCK_AUDITED_INVENTORY.assets) {
     if (a.category === "ens") {
       ops.push({

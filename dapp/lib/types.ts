@@ -8,8 +8,7 @@ export type AssetCategory =
   | "token"
   | "dust-token"
   | "nft"
-  | "ens"
-  | "approval";
+  | "ens";
 
 export type RiskLevel = "SAFE" | "SUSPICIOUS" | "DANGEROUS";
 
@@ -26,8 +25,6 @@ export interface Asset {
   decimals?: number;
   estimatedValueUsd?: number;
   imageUrl?: string;
-  approvalSpender?: `0x${string}`;
-  approvalSpenderLabel?: string;
   ensName?: string;
   ensNamehash?: string;
   riskLevel?: RiskLevel;
@@ -53,7 +50,6 @@ export interface DiscoveryInventory {
 }
 
 export type OpType =
-  | "REVOKE_ERC20"
   | "TRANSFER_ERC20"
   | "TRANSFER_ERC721"
   | "TRANSFER_ERC1155"
