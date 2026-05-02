@@ -5,9 +5,10 @@ export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 export const runtime = "edge";
 
-// Pixel-art astronaut head icon — same vibe as the in-app Mascot, rendered
-// as a 32×32 PNG via a 16×16 SVG grid scaled up. Uses inline divs because
-// ImageResponse doesn't support raw SVG children.
+// Pixel-art Michael Jackson icon — fedora, suit, red tie, white socks +
+// black shoes, raised glove. Rendered as a 32×32 PNG via a 16×16 grid of
+// 2×2 cells. Uses inline divs because ImageResponse doesn't support raw
+// SVG children. Composition matches the in-app Mascot.
 export default function Icon() {
   // Pixel grid: each cell is 2×2 px in the 32×32 output.
   const PX = 2;
@@ -32,12 +33,16 @@ export default function Icon() {
   const SKY = "#3F9CFF";
   const ORANGE = "#FF7A3D";
   const MINT = "#3FCD8A";
+  const SPARKLE = "#FFE7C2";
   const WHITE = "#FFFFFF";
 
   // Build the cells array imperatively to keep it readable.
   const cells: JSX.Element[] = [];
   let k = 0;
 
+  // fedora — small MJ tribute, sits above the helmet
+  for (let x = 3; x < 13; x++) cells.push(cell(x, 1, INK, `${k++}`));
+  for (let x = 5; x < 11; x++) cells.push(cell(x, 0, INK, `${k++}`));
   // helmet outline
   for (let x = 4; x < 12; x++) cells.push(cell(x, 2, INK, `${k++}`));
   for (let y = 3; y < 9; y++) cells.push(cell(3, y, INK, `${k++}`));
@@ -65,6 +70,18 @@ export default function Icon() {
   cells.push(cell(8, 12, ORANGE, `${k++}`));
   cells.push(cell(7, 13, MINT, `${k++}`));
   cells.push(cell(8, 13, MINT, `${k++}`));
+  // raised right arm with sparkly white glove
+  cells.push(cell(12, 9, INK, `${k++}`));
+  cells.push(cell(13, 9, INK, `${k++}`));
+  cells.push(cell(12, 10, WHITE, `${k++}`));
+  cells.push(cell(13, 10, WHITE, `${k++}`));
+  cells.push(cell(14, 9, WHITE, `${k++}`));
+  cells.push(cell(14, 8, SPARKLE, `${k++}`));
+  // left arm (back)
+  cells.push(cell(2, 11, INK, `${k++}`));
+  cells.push(cell(3, 11, INK, `${k++}`));
+  cells.push(cell(2, 12, WHITE, `${k++}`));
+  cells.push(cell(3, 12, WHITE, `${k++}`));
   // feet
   cells.push(cell(5, 15, INK, `${k++}`));
   cells.push(cell(6, 15, INK, `${k++}`));

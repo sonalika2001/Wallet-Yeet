@@ -8,11 +8,13 @@ import type {
   AgentRunMeta,
   AgentStatus,
 } from "@/lib/types";
+import { AgentAnimal } from "./AgentAnimal";
 // <HTML tags and comments written by AI.>
 
 interface AgentMeta {
   name: AgentName;
-  emoji: string;
+  /** Pixel-art mascot kind. Each animal matches the agent's personality. */
+  animal: "scout" | "auditor" | "planner";
   title: string;
   ensName: string;
   description: string;
@@ -23,25 +25,25 @@ interface AgentMeta {
 const META: AgentMeta[] = [
   {
     name: "scout",
-    emoji: "🔍",
+    animal: "scout",
     title: "Scout",
     ensName: "scout.walletyeet-demo.eth",
-    description: "Discovers tokens, NFTs, ENS, and approvals",
+    description: "Sniffs out tokens, NFTs, ENS, and approvals",
     accent: "bg-sky-100 border-ink-900",
     shadow: "shadow-pop-sky",
   },
   {
     name: "auditor",
-    emoji: "⚠️",
+    animal: "auditor",
     title: "Auditor",
     ensName: "auditor.walletyeet-demo.eth",
-    description: "Scores risk on every approval and contract",
+    description: "Watches every approval — flags the suspicious ones",
     accent: "bg-peach-100 border-ink-900",
     shadow: "shadow-pop-peach",
   },
   {
     name: "planner",
-    emoji: "📋",
+    animal: "planner",
     title: "Planner",
     ensName: "planner.walletyeet-demo.eth",
     description: "Sequences ops, routes assets to your destinations",
@@ -106,13 +108,12 @@ export function AgentPipeline({
               <div className="flex items-center gap-3 min-w-0">
                 <div
                   className={cn(
-                    "w-12 h-12 grid place-items-center rounded-2xl border-2 border-ink-900 text-2xl shrink-0",
+                    "w-12 h-12 grid place-items-center rounded-2xl border-2 border-ink-900 shrink-0 overflow-hidden",
                     m.accent,
                     m.shadow,
-                    isActive && "animate-wiggle"
                   )}
                 >
-                  {m.emoji}
+                  <AgentAnimal kind={m.animal} size={42} active={isActive} />
                 </div>
                 <div className="min-w-0">
                   <div className="font-display text-xl font-bold tracking-tight truncate flex items-center gap-1.5">
@@ -164,7 +165,7 @@ export function AgentPipeline({
             <div className="mt-3 min-h-[1.25rem] text-xs text-ink-700 font-medium">
               {messages?.[m.name] ??
                 (status === "running"
-                  ? `Calling GPT-4o-mini…`
+                  ? `Working…`
                   : status === "complete"
                   ? `Done`
                   : status === "error"
