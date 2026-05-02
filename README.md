@@ -13,13 +13,12 @@ WalletYeet is an AI-orchestrated wallet migration tool with **three specialized 
 Migrating an Ethereum wallet today is awful:
 - Manually send each ERC-20 token (often dozens)
 - Transfer NFTs one by one
-- Forget to revoke risky approvals on the old wallet
 - Lose ENS subnames or fail wrapped-vs-unwrapped transfer
 - Abandon dust tokens you can't afford to migrate
 - Leave native ETH behind because the manual flow is exhausting
 - Send everything to one wallet when you really want to split
 
-It's tedious, error-prone, and incomplete. The result: stale wallets full of risky approvals, dust, and forgotten value.
+It's tedious, error-prone, and incomplete. The result: stale wallets full of dust and forgotten value.
 
 ## The Solution
 
@@ -27,8 +26,8 @@ It's tedious, error-prone, and incomplete. The result: stale wallets full of ris
 1. Connect old wallet
 2. Specify destinations — split assets across multiple wallets
 3. Three AI agents stream their progress live:
-   🔍 Scout finds tokens, NFTs, ENS subnames, risky approvals, native ETH
-   ⚠️ Auditor scores every approval and flags dust
+   🔍 Scout finds tokens, NFTs, ENS subnames, native ETH
+   ⚠️ Auditor scores risk, flags dust, identifies unmigratable items
    📋 Planner sequences ops + discovers Uniswap pools at any fee tier
 4. You review and customize per-asset (toggle off, override destination)
 5. One signature — MetaMask handles the EIP-7702 batched execution
@@ -47,8 +46,6 @@ It's tedious, error-prone, and incomplete. The result: stale wallets full of ris
 - **Auto-discovery of any ERC-20** — Scout fetches balances via Alchemy and resolves name/symbol/decimals via `alchemy_getTokenMetadata` for any token the curated list doesn't recognize. Faucet anything to the demo wallet and it shows up automatically.
 - **Native ETH with dynamic gas reserve** — Scout fetches both balance and current gas price; the reserve is sized live as `1.5M gas × current price × 1.5 safety` (with a 0.001 ETH floor to protect against spikes between Scout time and signing time). The asset card shows the exact amount being held back.
 - **Wrapped ENS subname support** — NameWrapper ERC-1155 tokens are detected and routed via `safeTransferFrom` instead of the registry's `setOwner`. Includes on-chain `NameWrapper.names()` lookup so subnames get a readable label even when Alchemy's NFT response leaves the `name` field empty.
-- **Smart approval discovery** — known (token, spender) pairs scanned via direct contract reads. Production upgrade path is `getAssetTransfers` + `Approval` event log scan.
-
 ### Multi-destination + dust
 - **Multi-destination routing** — split assets across up to 5 wallets in one migration. Each row in the customize step has its own dropdown.
 - **Dust = real economic definition** — only tokens with a curated price under $1 are tagged "Dust" in the UI.
@@ -57,13 +54,12 @@ It's tedious, error-prone, and incomplete. The result: stale wallets full of ris
 - **Live plan summary** — toggle a row off and the plan summary updates immediately (deterministic count from the live op array, not a stale LLM string).
 
 ### EIP-7702 single-signature execution
-- **One signature for everything** — under the hood we use `wallet_sendCalls` (EIP-5792) which delegates the user's EOA to a tiny `Batcher` contract via EIP-7702 for one transaction. No per-asset approvals required: every transfer / swap / revocation runs with `msg.sender == userEOA`, so plain `transfer`, `safeTransferFrom`, `setOwner`, etc. work directly.
+- **One signature for everything** — under the hood we use `wallet_sendCalls` (EIP-5792) which delegates the user's EOA to a tiny `Batcher` contract via EIP-7702 for one transaction. No per-asset approvals required: every transfer / swap runs with `msg.sender == userEOA`, so plain `transfer`, `safeTransferFrom`, `setOwner`, etc. work directly.
 - **Legacy fallback always available** — if a wallet doesn't support 7702, a one-click toggle switches to the original approve-then-vault flow. Same demo, multi-sig path, ~7-14 signatures, never blocked.
 - **Honest partial-failure reporting** — per-call receipts decoded from the tx, displayed as ✓ / ✕ rows with a contextual hint (`Reverted on Uniswap router — no V3 pool for this token pair`).
 
 ## Why It Matters
 
-- Wallet drainers exploit forgotten approvals on old wallets
 - Lost ENS subnames get squatted by speculators
 - Dust tokens get abandoned (worth more than gas to transfer individually on mainnet)
 - Native ETH gets left behind because users forget to manually sweep it
@@ -82,7 +78,6 @@ WalletYeet is the first crypto **reorganization** tool, not just a migration too
 | DEX | Uniswap V3 SwapRouter02 (Sepolia: `0x3bFA47…e48E`); pool discovery via V3 Factory `getPool` across all 4 fee tiers |
 | Identity | ENS (Sepolia registry + NameWrapper); subnames + text records resolved on-chain via viem |
 | Orchestration | Server-Sent Events from Next.js API route; per-agent timing + output samples + ENS identities streamed live |
-| Reliability | KeeperHub webhook (post-migration notifications — see `lib/adapters/keeperhub.ts`) |
 | Hosting | Vercel (single deployment for frontend + agent APIs) |
 | Network | Sepolia testnet |
 
@@ -118,15 +113,11 @@ User → Next.js Frontend
         ┌─────────────────────────────┐
         │ All operations land:        │
         │  • Native ETH transfers     │
-        │  • Approval revocations     │
         │  • ERC-20/721/1155 transfers│
         │  • ENS (registry OR Wrapper)│
         │  • Uniswap V3 dust swaps    │
         │ Per-op events emitted       │
         └─────────────────────────────┘
-                       │
-                       ▼
-           KeeperHub webhook (notify Discord/Slack)
 ```
 
 ## Decisions we weighed
@@ -144,7 +135,6 @@ A short tour of the load-bearing tradeoffs we made and why:
 | **ENS subname discovery** | Alchemy NFT API (NameWrapper tokens) + on-chain `NameWrapper.names()` for missing labels | The Graph hosted ENS subgraph | The Graph deprecated their hosted service mid-2024 and the URL silently returns empty data. Alchemy + on-chain reads is reliable. |
 | **Wrapped ENS transfers** | Reuse existing `TRANSFER_ERC1155` opcode against NameWrapper | Add a separate `ENS_WRAPPED_TRANSFER` op | NameWrapper is ERC-1155 under the hood. Reusing the opcode means no contract change AND both 7702 + legacy paths handle it without special-cased code. |
 | **Strategy presets** | Removed (just default to "balanced") | Conservative / Balanced / Aggressive | The presets only affected an LLM prompt string, not real behavior. Per-asset toggles + multi-destination routing already give users full control. |
-| **KeeperHub integration** | Post-migration notification webhook | Submit migration tx through their relayer | Their managed-wallet flow doesn't fit user-signed migrations. The webhook gives us a real, working KeeperHub story without misrepresenting the architecture. |
 
 ## Sponsor Integrations
 
@@ -152,7 +142,6 @@ A short tour of the load-bearing tradeoffs we made and why:
 |---|---|---|
 | **Uniswap V3** | ✅ Working end-to-end | Real Sepolia LINK → real Sepolia USDC swap via V3 SwapRouter02. Multi-fee-tier pool discovery via factory `getPool`. See `FEEDBACK.md`. |
 | **ENS** | ✅ Working | Agent identity (scout/auditor/planner subnames with text records — qualifies for "ENS for AI Agents" track). Wrapped subname discovery + transfer (NameWrapper ERC-1155). |
-| **KeeperHub** | 🟡 Webhook integration | Post-migration notification only; managed-wallet relay path is an architectural mismatch with user-signed migrations. See `FEEDBACK_KEEPERHUB.md`. |
 
 ## Gas Optimization
 
