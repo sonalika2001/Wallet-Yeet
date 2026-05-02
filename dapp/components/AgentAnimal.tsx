@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 // an animal that matches the agent's personality:
 //
 //   scout   → puppy   (sniffs out the mess)
-//   auditor → owl     (watches every approval, big judgmental eyes)
+//   auditor → owl     (scores risk, big judgmental eyes)
 //   planner → fox     (clever sequencer)
 //
 // All three are drawn on the same 16×16 grid with `shapeRendering="crispEdges"`

@@ -180,25 +180,6 @@ export function planToBatcherSteps(
         break;
       }
 
-      case "REVOKE_ERC20": {
-        if (!op.counterparty) continue;
-        steps.push({
-          call: {
-            target: op.target,
-            value: 0n,
-            data: encodeFunctionData({
-              abi: ERC20_ABI,
-              functionName: "approve",
-              args: [op.counterparty, 0n],
-            }),
-            gas: GAS_HINT_ERC20_APPROVE,
-          },
-          origin: { assetId: op.assetId, opType: op.opType, subIndex: 0 },
-          label: op.explanation || "Revoke approval",
-        });
-        break;
-      }
-
       case "TRANSFER_ERC20": {
         steps.push({
           call: {
