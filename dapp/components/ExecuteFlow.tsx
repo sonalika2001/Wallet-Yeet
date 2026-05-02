@@ -131,4 +131,127 @@ export function ExecuteFlow({ plan, destinations, defaultDestination }: Props) {
     };
   }, [publicClient, migrationTxHash, phase]);
 
+  // ── Gas estimate accounting ─────────────────────────────────────────
+  const TX_BASE_GAS = 21_000n;
+  const SET_CODE_AUTH_GAS = 25_000n;
+  const APPROVE_GAS = 50_000n;
+  const sumCallGas = batcherSteps.reduce(
+    (acc, s) => acc + (s.call.gas ?? 0n),
+    0n,
+  );
+  const legacyVaultOpGas = plan.operations
+    .filter((o) => o.opType !== "TRANSFER_NATIVE")
+    .reduce((acc) => acc + 80_000n, 0n);
+  const estimatedBatchedGas = use7702
+    ? TX_BASE_GAS + SET_CODE_AUTH_GAS + sumCallGas
+    : TX_BASE_GAS + legacyVaultOpGas;
+
+  const equivalentUnbatchedGas = (() => {
+    // Per-asset approve (real users on mainnet would do this for ERC-20s
+    // and per-collection for NFTs) plus per-op base costs.
+    const approvalCount =
+      collectErc20Approvals(plan.operations).length +
+      collectNftCollections(plan.operations).length;
+    const opCount = plan.operations.length;
+    return (
+      BigInt(approvalCount + opCount) * TX_BASE_GAS +
+      BigInt(approvalCount) * APPROVE_GAS +
+      sumCallGas
+    );
+  })();
+  const gasSavingsAbs =
+    equivalentUnbatchedGas > estimatedBatchedGas
+      ? equivalentUnbatchedGas - estimatedBatchedGas
+      : 0n;
+  const gasSavingsPct =
+    equivalentUnbatchedGas > 0n
+      ? Number((gasSavingsAbs * 100n) / equivalentUnbatchedGas)
+      : 0;
+  const estimatedCostWei =
+    gasPriceWei !== null ? estimatedBatchedGas * gasPriceWei : null;
+  const actualCostWei =
+    actualGasUsed !== null && gasPriceWei !== null
+      ? actualGasUsed * gasPriceWei
+      : null;
+  const fmtEth = (wei: bigint | null) => {
+    if (wei === null) return "—";
+    if (wei === 0n) return "0 ETH";
+    const eth = Number(wei) / 1e18;
+    if (eth >= 0.001) return `${eth.toFixed(5)} ETH`;
+    if (eth >= 0.000001) return `${(eth * 1e6).toFixed(2)} µETH`;
+    // Sub-µETH: show the wei count; useful on near-zero-gas Sepolia.
+    return `${wei.toString()} wei`;
+  };
+  const fmtGas = (gas: bigint | null) => {
+    if (gas === null) return "—";
+    if (gas >= 1_000_000n) return `${(Number(gas) / 1e6).toFixed(2)}M gas`;
+    if (gas >= 1_000n) return `${(Number(gas) / 1e3).toFixed(0)}k gas`;
+    return `${gas.toString()} gas`;
+  };
+  const fmtGwei = (wei: bigint | null) => {
+    if (wei === null) return "—";
+    const gwei = Number(wei) / 1e9;
+    if (gwei >= 1) return `${gwei.toFixed(2)} gwei`;
+    if (gwei >= 0.01) return `${gwei.toFixed(3)} gwei`;
+    // Below 0.01 gwei (rare even for Sepolia). Show milli-gwei to be useful.
+    return `${(gwei * 1000).toFixed(2)} mgwei`;
+  };
+
+  const successCount = stepResults.filter((r) => r.success).length;
+  const failedCount = stepResults.length - successCount;
+  const totalSteps = use7702 ? batcherSteps.length : plan.operations.length;
+  const allSucceeded =
+    phase === "complete" && failedCount === 0 && stepResults.length > 0;
+  const partialFail = phase === "complete" && failedCount > 0;
+  const explorerUrl = migrationTxHash
+    ? `https://sepolia.etherscan.io/tx/${migrationTxHash}`
+    : null;
+
   
+
+// ─────────────────────────────────────────────────────────────────────────
+// Helpers (legacy path only)
+// ─────────────────────────────────────────────────────────────────────────
+
+function collectErc20Approvals(
+  ops: PlannedOperation[]
+): { token: `0x${string}`; amount: bigint }[] {
+  const totals = new Map<`0x${string}`, bigint>();
+  for (const op of ops) {
+    if (op.opType !== "TRANSFER_ERC20" && op.opType !== "SWAP_AND_TRANSFER") continue;
+    const token = op.target;
+    const amt = BigInt(op.amount ?? "0");
+    totals.set(token, (totals.get(token) ?? 0n) + amt);
+  }
+  return Array.from(totals.entries()).map(([token, amount]) => ({ token, amount }));
+}
+
+function collectNftCollections(ops: PlannedOperation[]): `0x${string}`[] {
+  const seen = new Set<`0x${string}`>();
+  for (const op of ops) {
+    if (op.opType === "TRANSFER_ERC721" || op.opType === "TRANSFER_ERC1155") {
+      seen.add(op.target);
+    }
+  }
+  return Array.from(seen);
+}
+
+function encodeOperations(ops: PlannedOperation[]) {
+  // Native ETH ops are filtered out before this is called — they don't go
+  // through MigrationVault. PlannedOperation.opType is a flat union (not
+  // a discriminated tagged union) so we can't narrow via predicate;
+  // instead we filter out TRANSFER_NATIVE then cast the remaining opType
+  // to the keys MigrationVault understands.
+  type VaultOpType = keyof typeof OP_TYPE_TO_UINT;
+  return ops
+    .filter((op) => op.opType !== "TRANSFER_NATIVE")
+    .map((op) => ({
+      opType: OP_TYPE_TO_UINT[op.opType as VaultOpType],
+      target: op.target,
+      counterparty: (op.counterparty ?? ZERO) as `0x${string}`,
+      tokenId: BigInt(op.tokenId ?? "0"),
+      amount: BigInt(op.amount ?? "0"),
+      destination: op.destination,
+    }));
+}
+
