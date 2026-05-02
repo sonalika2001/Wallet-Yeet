@@ -149,6 +149,8 @@ body {
   text-transform: uppercase;
   border-radius: 999px;
   border: 1.5px solid #1a1733;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .pill--safe {
   background: #e8fbf3;
