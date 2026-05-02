@@ -360,6 +360,64 @@ export function ExecuteFlow({ plan, destinations, defaultDestination }: Props) {
           );
         }
 
+        // EIP-5792 receipt accounting per chunk. Atomic 7702 batch returns
+        // one receipt for the whole tx; sequential batch returns one per
+        // call. Use the same heuristic as before: if ONE receipt for >1
+        // sub-calls and it's success, mark every sub-call as succeeded.
+        const receipts = final.receipts ?? [];
+        const oneReceiptIsSuccess =
+          receipts.length === 1 &&
+          (receipts[0].status === "success" ||
+            receipts[0].status === 1 ||
+            receipts[0].status === "0x1");
+        const isAtomicBatch =
+          receipts.length === 1 && chunk.length > 1 && oneReceiptIsSuccess;
+
+        const chunkResults = isAtomicBatch
+          ? chunk.map((_, i) => ({ index: baseIndex + i, success: true }))
+          : receipts.map((r, i) => ({
+              index: baseIndex + i,
+              success:
+                r.status === "success" || r.status === 1 || r.status === "0x1",
+            }));
+        aggregateResults.push(...chunkResults);
+        // Update UI progressively so users watching see ✓s fill in chunk by
+        // chunk rather than waiting until every chunk lands.
+        setStepResults([...aggregateResults]);
+      }
+
+      const finalTxHash = firstTxHash;
+      if (finalTxHash) {
+        setMigrationTxHash(finalTxHash);
+      }
+      setYeeted(true);
+      setPhase("complete");
+    } catch (err) {
+      console.error("[ExecuteFlow:7702] failed:", err);
+      // Surface the real error verbatim. The viem/wagmi/MetaMask stack has
+      // many possible failure modes here (method not exposed, chain mismatch,
+      // user rejection, missing signAuthorization on this wagmi version,
+      // etc.) so guessing the cause and overriding the message just hides
+      // useful debugging info. The legacy fallback toggle below the YEET
+      // button gives users an out without us pretending to know.
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+          ? err
+          : "Unknown error — check the browser console.";
+      const userRejected =
+        msg.toLowerCase().includes("user rejected") ||
+        msg.toLowerCase().includes("user denied") ||
+        (err as { code?: number })?.code === 4001;
+      setErrorMsg(
+        userRejected
+          ? "Signature rejected in MetaMask. Click YEET again or tick 'Use legacy flow' to try the multi-sig path."
+          : `${msg}\n\nIf this looks like an EIP-7702 incompatibility, tick "Use legacy flow" below and retry. Full error in the browser console.`,
+      );
+      setPhase("error");
+    }
+  };
   // ── Legacy approve-then-vault flow (used when Batcher isn't deployed) ─
   const startYeetLegacy = async () => {
     if (!address || onWrongChain || noVault || !publicClient) {
@@ -693,29 +751,6 @@ export function ExecuteFlow({ plan, destinations, defaultDestination }: Props) {
               </div>
             </div>
           )}
-
-        {/* MetaMask sometimes flashes "transaction may fail" or a high
-            estimated fee on Sepolia because its testnet simulator can be
-            flaky for batched 7702 txs. The on-chain Batcher uses
-            try/catch around each call, so a single revert never aborts
-            the rest. Surface this once during idle so users sign through
-            the warning instead of bailing. */}
-        {use7702 && phase === "idle" && (
-          <div className="mt-4 rounded-xl border-2 border-sky-200 bg-sky-50 p-3 text-xs text-ink-700">
-            <div className="font-semibold mb-1 flex items-center gap-1.5">
-              <span>ℹ️</span>
-              If MetaMask shows &ldquo;transaction may fail&rdquo; — sign anyway
-            </div>
-            <p className="leading-relaxed">
-              MetaMask&apos;s Sepolia simulator is flaky for batched
-              EIP-7702 transactions and may flag a false positive or quote
-              a high gas estimate. The Batcher contract wraps every
-              sub-call in <code>try/catch</code>, so a single revert
-              doesn&apos;t take down the rest — successful ops still move
-              real assets and you can verify on Etherscan after signing.
-            </p>
-          </div>
-        )}
 
         {/* EIP-7702 / legacy fallback toggle. Only visible if the Batcher
             contract is actually deployed; otherwise legacy is the only path. */}
