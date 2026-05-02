@@ -6,8 +6,8 @@ export function Footer() {
           Built for ETHGlobal Open Agents · Sepolia testnet · Uniswap + ENS
         </div>
         <div className="flex items-center gap-4">
-          <span className="font-pixel text-[10px]">v0.1.0</span>
-          <span>Three agents. One batched yeet.</span>
+          <span className="font-pixel text-[10px]">v0.0.1</span>
+          <span className="italic">One signature. Zero baggage. Your wallet, reorged.</span>
         </div>
       </div>
     </footer>
