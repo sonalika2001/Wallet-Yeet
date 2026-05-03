@@ -140,7 +140,7 @@ A short tour of the load-bearing tradeoffs we made and why:
 
 | Sponsor | Status | What's actually shipped |
 |---|---|---|
-| **Uniswap V3** | ✅ Working end-to-end | Real Sepolia LINK → real Sepolia USDC swap via V3 SwapRouter02. Multi-fee-tier pool discovery via factory `getPool`. See `FEEDBACK.md`. |
+| **Uniswap V3** | ✅ Working | Real Sepolia LINK → real Sepolia USDC swap via V3 SwapRouter02. Multi-fee-tier pool discovery via factory `getPool`. See `FEEDBACK.md`. |
 | **ENS** | ✅ Working | Agent identity (scout/auditor/planner subnames with text records — qualifies for "ENS for AI Agents" track). Wrapped subname discovery + transfer (NameWrapper ERC-1155). |
 
 ## Gas Optimization
@@ -159,7 +159,7 @@ Plus baked into the contracts:
 - Per-operation `try/catch` so one failing asset doesn't waste the rest's gas
 - No separate audit-log contract call — events emit directly from the vault and Batcher
 
-For mainnet, additional wins live in the [ROADMAP](./ROADMAP.md):
+These are some additional wins scoped for the future:
 - **EIP-2612 `permit()`** for tokens that support it (real USDC, DAI) — converts approvals into free off-chain signatures
 - **L2 deployment** (Base, Arbitrum, Optimism) for the same gas units at 10–100× cheaper real cost
 - **Gas-aware dust threshold** — only swap dust when its value exceeds the gas cost (avoids paying $20 in gas to swap $0.40 of dust)
@@ -168,8 +168,6 @@ For mainnet, additional wins live in the [ROADMAP](./ROADMAP.md):
 ## Status
 
 ✅ Built for ETHGlobal Open Agents Hackathon (April 24 - May 3, 2026). Live on Sepolia.
-
-See [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) for the demo walkthrough, [ARCHITECTURE.md](./ARCHITECTURE.md) for system internals, and [ROADMAP.md](./ROADMAP.md) for future scope.
 
 ## License
 
