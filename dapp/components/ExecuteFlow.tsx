@@ -544,7 +544,7 @@ export function ExecuteFlow({ plan, destinations, defaultDestination }: Props) {
       <div className="card-pop p-6 relative overflow-hidden">
         <div className="grid sm:grid-cols-[auto,1fr,auto] items-center gap-5">
           <div className={allSucceeded ? "animate-mascot-celebrate" : undefined}>
-            <Mascot size={120} yeeting={allSucceeded} />
+            <Mascot size={120} yeeting={false} />
           </div>
           <div>
             <div className="font-display text-2xl font-bold tracking-tight">

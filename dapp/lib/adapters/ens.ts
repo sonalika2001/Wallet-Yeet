@@ -20,6 +20,7 @@ export interface ENSSubname {
 // registered a subname with one of these labels via the ENS UI (wrapped
 // or unwrapped), we'll find it by direct registry lookup.
 const COMMON_SUBNAME_LABELS = [
+  // Identity / role labels
   "alice",
   "bob",
   "vault",
@@ -30,6 +31,16 @@ const COMMON_SUBNAME_LABELS = [
   "savings",
   "display",
   "nft",
+  "personal",
+  "work",
+  // Test / demo labels — covers labels picked during demo recording
+  "test",
+  "test1",
+  "test2",
+  "testsubname",
+  "demo",
+  "dev",
+  "sample",
 ];
 
 const ENS_REGISTRY_ABI = [
